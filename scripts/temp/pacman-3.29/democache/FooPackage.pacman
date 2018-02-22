@@ -1,0 +1,4 @@
+#
+#   FooPackage
+#
+message('Foo is a test Pacman Package.')

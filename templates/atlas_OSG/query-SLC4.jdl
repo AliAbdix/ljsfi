@@ -1,0 +1,20 @@
+Executable = "/bin/hostname";
+OutputSandbox = {"stdout","stderr"};
+stdoutput = "stdout";
+stderror = "stderr";
+VirtualOrganisation = "atlas";
+Requirements = ((  other.GlueHostOperatingSystemName == "CentOS"
+                || other.GlueHostOperatingSystemName == "RedHatEnterpriseAS"
+                )
+                &&
+                (  other.GlueHostOperatingSystemRelease >= 4.0
+                )
+               )
+               ||
+               ((  RegExp("Scientific.*",other.GlueHostOperatingSystemName)
+                )
+                &&
+                (  other.GlueHostOperatingSystemRelease >= 4.0
+                )
+               );
+#Requirements = other.GlueCEPolicyMaxCPUTime > 1500;

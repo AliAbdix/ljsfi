@@ -1,0 +1,6 @@
+#
+#	Sample package asking installation questions
+#
+{ choice(   'red', 'Choose a color','red', 'green','blue'); message(   'Red')  OR 
+  choice( 'green', 'Choose a color','red', 'green','blue'); message( 'Green')  OR
+  choice(  'blue', 'Choose a color','red', 'green','blue'); message(  'Blue') }

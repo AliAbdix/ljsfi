@@ -1,0 +1,89 @@
+#!/usr/bin/perl -w
+use strict;
+
+eval {
+local $SIG{ALRM} = sub { die "alarm clock restart" };
+alarm 100;
+my @attrs = qw(sn cn uid);
+my $base = 'mds-vo-name=local,o=grid';
+my $server = $ENV{'LJSF_DEFBDII'};
+if (!defined $server) { $server = "exp-bdii.cern.ch"; }
+my $port = 2170;
+
+die "Usage: get-site-info <CE FQDN>\n" if not $ARGV[0];
+
+eval 'require Net::LDAP;';
+die "Could not load Net::LDAP: $@\n" if $@;
+
+my $ldap = Net::LDAP->new($server, port => $port, timeout => 30) or
+	die "Could not contact LDAP server $server:$port";
+$ldap->bind or die 'Could not bind';
+
+my @results = ();
+my $cename= $ARGV[0];
+
+my $query = "(&(objectclass=GlueCE)(GlueCEUniqueID=$cename*))";
+my $mesg = $ldap->search(base => $base, filter => $query)
+	   or die 'Failed search';
+
+my $cehcluster;
+foreach my $entry ($mesg->entries) {
+	my $cehcluster = $entry->get_value('GlueCEHostingCluster');
+	if (defined $cehcluster) {push @results, "GlueCEHostingCluster: $cehcluster\n";}
+}
+
+$query = "(&(objectclass=GlueCluster)(GlueForeignKey=GlueCEUniqueID=$cename*))";
+$mesg = $ldap->search(base => $base, filter => $query)
+	or die 'Failed search';
+
+my $name;
+foreach my $entry ($mesg->entries) {
+	$name = $entry->get_value('GlueClusterUniqueID');
+	if (defined $name) {push @results, "GlueClusterUniqueID: $name\n";}
+}
+
+
+if (defined $name) {
+	$query = "(&(objectclass=GlueSubCluster)(GlueChunkKey=GlueClusterUniqueID=$name))";
+	$mesg = $ldap->search(base => $base, filter => $query)
+		   or die 'Failed search';
+}
+
+#foreach my $entry ($mesg->all_entries) {
+#	$entry->dump;
+#}
+my $subsite = "";
+foreach my $entry ($mesg->entries) {
+	my @dn = split(/mds-vo-name=/i,$entry->dn);
+	$subsite = $dn[1];
+	if (length($subsite) > 0) {
+		$subsite =~ s/,//g;
+		$subsite = "GlueSiteName: $subsite\n";
+	}
+	my $scname = $entry->get_value('GlueSubClusterUniqueID');
+	if (defined $scname) {push @results, "GlueSubClusterUniqueID: $scname\n";}
+	my $os = $entry->get_value('GlueHostOperatingSystemName');
+	if (defined $os) {push @results, "GlueHostOperatingSystemName: $os\n";}
+	my $osrel = $entry->get_value('GlueHostOperatingSystemRelease');
+	if (defined $osrel) {push @results, "GlueHostOperatingSystemRelease: $osrel\n";}
+	my $osver = $entry->get_value('GlueHostOperatingSystemVersion');
+	if (defined $osver) {push @results, "GlueHostOperatingSystemVersion: $osver\n";}
+        my $gridname = "EGEE";
+        foreach my $RTE ($entry->get_value('GlueHostApplicationSoftwareRunTimeEnvironment')) {
+            if ($RTE =~ m/^GLITE/) { $gridname = "EGEE"; }
+            if ($RTE =~ m/^OSG/) { $gridname = "OSG"; }
+        }
+        push @results, "gridName: $gridname\n";
+}
+
+$ldap->unbind;
+if (@results) {
+    my %combres;
+    @combres{@results} = ();
+    my @uniqresults = sort keys %combres;
+    print @uniqresults;
+}
+if (length($subsite) > 0) { print $subsite; }
+
+exit 1 unless @results;
+}

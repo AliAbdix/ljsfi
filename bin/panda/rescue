@@ -1,0 +1,34 @@
+#!/bin/sh
+
+JOB="$1"
+
+#Check the DB status
+$BINPATH/dbcheck
+rc=$?
+[ $rc -ne 0 ] && exit $rc
+
+if [ "$JOB" == "" ] ; then
+  echo "Usage: `basename $0` <jobname>"
+  exit -1
+fi
+
+TMPJOBID="jobid.$$.tmp"
+ljsfbkk.py --select="job.id" --jobname="${JOB}" --quiet > $TMPJOBID
+cat $TMPJOBID | while read jobid; do
+  JOBNAME="`ljsfbkk.py --select=job.name --jobid=$jobid --quiet`"
+  JDLNAME="`ljsfbkk.py --select=jdl.name --jobid=$jobid --quiet`"
+  echo "=============================="
+  echo
+  echo "Rescuing data from DB for job $JOBNAME"
+  echo "JDL NAME: $JDLNAME"
+  echo "JOB NAME: $JOBNAME"
+  echo
+  ljsfbkk.py --select="jdl.content" --jobid="$jobid" --quiet > $JDLPATH/$JDLNAME
+  JOBINFO="`ljsfbkk.py --select=output --jobid="$jobid" --quiet`"
+  echo "PandaID=`echo $JOBINFO | cut -d, -f 1 | sed 's/ *//g'`" > $JOBSPATH/$JOBNAME
+  echo "DatasetName=`echo $JOBINFO | cut -d, -f 4 | sed 's/ *//g'`" >> $JOBSPATH/$JOBNAME
+done
+
+rm -fr $TMPJOBID
+
+exit

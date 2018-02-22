@@ -1,0 +1,64 @@
+#!/bin/sh
+
+# Check for the cache directory definition
+if [ "$LJSFCACHEPATH" == "" ] ; then
+  echo "No cache dir defined. Exiting."
+  exit -1
+fi
+
+# Check and create the cache directory
+[ ! -d $LJSFCACHEPATH ] && mkdir -p $LJSFCACHEPATH
+if [ ! -d $LJSFCACHEPATH ] ; then
+  echo "Cannot create $LJSFCACHEPATH. Exiting."
+  exit -1
+fi
+
+# URLs for the T0 caches
+PKG_URL="http://atlas-computing.web.cern.ch/atlas-computing/links/kitsDirectory/Production/cache/"
+PKG_NAME="AtlasTier0"
+REL_SUFFIX="-t0"
+TAG_PREFIX="VO-atlas-tier0"
+PKG_FILE="${PKG_NAME}.list"
+PKG_ARCH="_i686_slc4_gcc34_opt"
+PKG_PATT="${PKG_NAME}\(.*\)${PKG_ARCH}\(.*\)pacman\ "
+PKG_LIST="$CONFPATH/atlastier0.list"
+REL_TYPE="14" # Tier0 production patches
+
+# Download the file list
+cd $LJSFCACHEPATH
+
+[ -f ${PKG_FILE} ] && mv -f ${PKG_FILE} ${PKG_FILE}.save || touch ${PKG_FILE}.save
+curl -s ${PKG_URL} | sed -e 's#.*<[aA] .*>\(.*\)</[aA]>#\1#g' | grep "${PKG_PATT}" | while read line; do
+  PKGNAME="`echo $line | awk '{print $1}'`"
+  PKGDATE="`echo $line | awk '{print $2" "$3}'`"
+  PKGSTAMP="`date +%s -d "$PKGDATE"`"
+  PKGSIZE="`echo $line | awk '{print $4}'`"
+  echo "${PKGNAME} ${PKGSTAMP} ${PKGSIZE}" >> ${PKG_FILE}
+done
+
+# Check whether we have release to handle
+diff ${PKG_FILE} ${PKG_FILE}.save --side-by-side | grep "<" | while read line; do
+  REL="`echo $line | sed -e "s#$PKG_PATT\(.*\)#\1#g" -e "s#_#.#g" -e "s#^[._]##g"`"
+  if [ "$REL" != "" ] ; then
+    BASEREL="`echo $REL | cut -d. -f 1-3`"
+    RELNAME="${REL}${REL_SUFFIX}"
+    TAGNAME="${TAG_PREFIX}-${REL}"
+    PKGNAME="${TAG_PREFIX}-$REL-1-`echo $PKG_ARCH | sed -e 's#^_##g' -e "s#_opt#-opt#g"`.tar.gz"
+    RELINFO="`ljsfinfo.py --queryrel=$BASEREL`"
+    if [ $? -eq 0 ] ; then
+      PACVER="`echo $RELINFO | cut -d, -f 16 | sed 's#"##g'`"
+      RELAREA="`echo $RELINFO | cut -d, -f 18 | sed 's#"##g'`"
+      SWPHYS="`echo $RELINFO | cut -d, -f 28 | sed 's#"##g'`"
+      SWLOG="`echo $RELINFO | cut -d, -f 29 | sed 's#"##g'`"
+      SWPHYS="`echo $SWPHYS | sed -e 's/\\$/@/g' -e 's/@/\\\\$/g'`"
+      SWLOG="`echo $SWLOG | sed -e 's/\\$/@/g' -e 's/@/\\\\$/g'`"
+      echo "Defining $RELNAME"
+      echo ljsfinfo.py --define="name=$RELNAME,build=project,typefk=$REL_TYPE,archfk=6,sw_archfk=6,userfk=1,default_validate_taskfk=73,default_install_taskfk=74,default_test_taskfk=75,default_uninstall_taskfk=76,default_cleanup_taskfk=77,default_publish_tag_taskfk=78,default_remove_tag_taskfk=79,obsolete=0,autoinstall=0,sw_name=$PKG_NAME,sw_revision=1,pacman_version=$PACVER,pacman_platform=auto,sw_versionarea=$RELAREA,requires=$BASEREL,sw_physicalpath=$SWPHYS,sw_logicalpath=$SWLOG,sw_atlas_fix_64=no,sw_atlas_compiler=no,sw_diskspace=2000000:1000:500000,kvpost=yes,tag=$TAGNAME,package=$PKGNAME"
+      ljsfinfo.py --define="name=$RELNAME,build=project,typefk=$REL_TYPE,archfk=6,sw_archfk=6,userfk=1,default_validate_taskfk=73,default_install_taskfk=74,default_test_taskfk=75,default_uninstall_taskfk=76,default_cleanup_taskfk=77,default_publish_tag_taskfk=78,default_remove_tag_taskfk=79,obsolete=0,autoinstall=0,sw_name=$PKG_NAME,sw_revision=1,pacman_version=$PACVER,pacman_platform=auto,sw_versionarea=$RELAREA,requires=$BASEREL,sw_physicalpath=$SWPHYS,sw_logicalpath=$SWLOG,sw_atlas_fix_64=no,sw_atlas_compiler=no,sw_diskspace=2000000:1000:500000,kvpost=yes,tag=$TAGNAME,package=$PKGNAME"
+      # Make this release auto-installing in Tier1 centers
+      ljsfinfo.py --set-autoinstall=tier1 --rel=$RELNAME
+    fi
+  fi
+done
+
+exit

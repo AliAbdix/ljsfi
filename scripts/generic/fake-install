@@ -1,0 +1,16 @@
+#!/bin/sh
+
+echo "Fake installation simulator"
+echo "This script does actually nothing, but simulates an installation job"
+echo "This job ran on `hostname -f` on `date`"
+echo "The install.xml file, required for the short description of the job,"
+echo "will be created now."
+
+cat > install.xml <<EOD
+<?xml version=1.0 encoding=UTF-8?>
+<install>
+<fakeinstall type="INFO" datetime="`date`">Running on `hostname -f`</fakeinstall>
+</install>
+EOD
+
+exit

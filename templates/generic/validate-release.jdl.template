@@ -1,0 +1,9 @@
+Executable = "fake-install";
+InputSandbox = {"@SCRIPTPATH@/fake-install"};
+OutputSandbox = {"stdout", "stderr", "install.xml"};
+stdoutput = "stdout";
+stderror = "stderr";
+Arguments = "fake-install --validate @RELEASE@ --path @PHYSICALPATH@";
+Environment = {"LFC_HOST=@LFC_HOST@"};
+VirtualOrganisation = "@VO@";
+Requirements = other.GlueCEUniqueId=="@SITE_CS@";

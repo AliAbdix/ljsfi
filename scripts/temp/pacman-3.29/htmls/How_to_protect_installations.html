@@ -1,0 +1,25 @@
+<title>How to protect installations from being modified by other packages</title>
+<body background="sky.gif">
+
+<h1><font color=navy>How to protect installations from being modified by other packages</font></h1>
+<hr size=5>
+One way to do this is to use <a href="basic.html">watch</a>.  If you do
+<pre><b><font color="#8B0000">watch('myDirectory')
+</font></pre></b>
+for example, Pacman will absorb the directory tree <b>myDirectory/...</b> into the environment that it watches over.  The
+<b>'time'</b> argument means that Pacman will save the time stamps of all the files in the tree.  In this case, when an
+installer does
+<pre><b><font color="#8B0000"> % pacman -verify
+</font></pre></b>
+Pacman will check that none of the files have been modified.
+<p>
+      In Pacman, if your package environment needs package Foo and you want to be sure that your package will be
+re-installed if Foo ever changes, the normal thing do do is
+<pre><b><font color="#8B0000"> % configure('Foo')
+</font></pre></b>
+If "Foo" is, on the other hand, non-Pacman installed software, you can do something similar by using <i>watch</i>
+to absorb the contents of Foo into your environment.  
+<hr size=5>
+<h3><a href="http://physics.bu.edu/pacman/" target="_blank">Pacman Headquarters</a></h3>
+<p>
+</body>

@@ -1,0 +1,9 @@
+Executable = "gbb";
+InputSandbox = {"@SCRIPTPATH@/cleanup-test.sh","@SCRIPTPATH@/gbb"};
+OutputSandbox = {"stdout", "stderr"};
+stdoutput = "stdout";
+stderror = "stderr";
+Arguments = "--timing -v -s @GBB_SURL@ -p -m 300 -D 300 ./cleanup-test.sh @RELEASE@";
+Environment = {"arch=@ARCH@","relarch=@RELARCH@","platform=@PACMANPLATFORM@","PACMAN_VER=@PACMANVERSION@","LCG_CATALOG_TYPE=@LCGCATALOGTYPE@","LFC_HOST=@LFCHOST@","VERAREA=@VERSIONAREA@","USERDIR=@USERDIRECTORY@","ATLAS_COMPILER=@ATLASCOMPILER@"};
+VirtualOrganisation = "atlas";
+Requirements = other.GlueCEUniqueId=="@SITE_CS@";

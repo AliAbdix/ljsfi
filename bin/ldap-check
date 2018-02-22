@@ -1,0 +1,11 @@
+#!/bin/sh
+
+if [ "$1" = "" ] ; then
+  echo "Usage: ldap-check <hostname>"
+  exit -1
+fi
+
+ldapsearch -x -P2 -h $1  -p 2135 -b "mds-vo-name=local,o=grid"
+#ldapsearch -x -P2 -h $1  -p 2135 -b "mds-vo-name=INFN-ROMA1,o=grid"
+
+exit

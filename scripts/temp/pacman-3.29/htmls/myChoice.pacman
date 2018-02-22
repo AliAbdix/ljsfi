@@ -1,0 +1,6 @@
+#
+#
+package('../cache/myDemo.caches:Choice')
+
+message('installed')
+

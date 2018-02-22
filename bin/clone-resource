@@ -1,0 +1,93 @@
+#!/bin/sh
+showhelp()
+{
+  echo "Usage: `basename $0` [OPTIONS]"
+  echo "       OPTIONS:"
+  echo "          -a|--api                     Use the AGIS API interface."
+  echo "          -c|--comments <comments>     Use customized comments."
+  echo "          -f|--filter <pattern>        Clone only releases satisfying <pattern>."
+  echo "          -h|--help                    Show this help."
+  echo "          -d|--dest <resource_name>    Name of the destination resource."
+  echo "          -s|--source <resource_name>  Name of the source resource."
+  echo "          -t|--trial                   Trial run."
+  echo "          -v|--verbose                 Increase verbosity."
+  exit 0
+}
+
+timeout () {
+    perl -e 'alarm shift; exec @ARGV' "$@";
+}
+
+TAGTASK="validation"
+RELFILTER=".*"
+
+OPTS=`getopt -o hac:d:f:s:tv -l help,api,comments:,dest:,filter:,source:,trial,verbose -- "$@"`
+if [ $? != 0 ] ; then echo "Terminating..."; exit -1 ; fi
+eval set -- "$OPTS"
+while true ; do
+        case "$1" in
+                -h|--help)         showhelp; shift;;
+                -a|--api)          AGISAPI="--api"; shift;;
+                -c|--comments)     COMMENTS="$2"; shift 2;;
+                -d|--dest)         DRESNAME="$2"; shift 2;;
+                -f|--filter)       RELFILTER="$2"; shift 2;;
+                -s|--source)       SRESNAME="$2"; shift 2;;
+                -t|--trial)        TRIAL="y"; shift;;
+                -v|--verbose)      VERBOSE="yes"; shift;;
+                --)                shift ; break ;;
+                \?)                break ;
+                exit ;;
+        esac
+done
+
+if [ -z "$SRESNAME" ] ; then
+    echo "No source specified"
+    exit 1
+fi
+
+if [ -z "$DRESNAME" ] ; then
+    echo "No destination specified"
+    exit 1
+fi
+
+if [ "$DRESNAME" == "$SRESNAME" ] ; then
+    echo "The destination must be different from the source"
+    exit 2
+fi
+
+[ -z "$COMMENTS" ] && COMMENTS="Cloned $TAGTASK from $SRESNAME"
+
+TMPDUMP="/tmp/clone-resource.$$.tmp"
+TMPSREL="/tmp/clone-resource.list.$$.tmp"
+TMPDREL="/tmp/clone-resource-dest.list.$$.tmp"
+ljsf-infosys --info --panda-resource $DRESNAME --cache --cache-timeout 7200 &> $TMPDUMP
+SITENAME="`cat $TMPDUMP | grep '^SITENAME=' | tail -n 1 | cut -d= -f 2`"
+GNAME="`cat $TMPDUMP | grep '^GRID=' | tail -n 1 | cut -d= -f 2`"
+ljsfinfo.py --quiet --select='DISTINCT(release_stat.name)' --status=installed --cs=$SRESNAME | sed 's/"//g' | grep "$RELFILTER" > $TMPSREL
+ljsfinfo.py --quiet --select='DISTINCT(release_stat.name)' --status=installed --cs=$DRESNAME | sed 's/"//g' > $TMPDREL
+RELCOUNT="`cat $TMPSREL | wc -l`"
+RELINDX=0
+RELPROGSTEP=1
+cat $TMPSREL | while read RELNAME; do
+    RELINDX=$((RELINDX+1))
+    RELPROGRESS=$((100*RELINDX/RELCOUNT))
+    if [ -z "`grep ^$RELNAME$ $TMPDREL 2>/dev/null`" ] ; then
+        if [ -n "$TRIAL" ] ; then
+            echo ljsfreq.py --cs=$DRESNAME --rel=$RELNAME --reqtype=$TAGTASK --sitename=$SITENAME --status=done --grid-name=$GNAME --comments="$COMMENTS"
+            echo ljsfinfo.py --rel=$RELNAME --cs=$DRESNAME --status=installed
+            echo agis-tags --add --rel=$RELNAME --panda-resource=$DRESNAME $AGISAPI
+        else
+            [ -n "$VERBOSE" ] && echo "Tagging release $RELNAME in $DRESNAME"
+            ljsfreq.py --cs=$DRESNAME --rel=$RELNAME --reqtype=$TAGTASK --sitename=$SITENAME --status=done --grid-name=$GNAME --comments="$COMMENTS"
+            ljsfinfo.py --rel=$RELNAME --cs=$DRESNAME --status=installed
+            agis-tags --add --rel=$RELNAME --panda-resource=$DRESNAME $AGISAPI
+        fi
+    else
+        echo "Skipping release $RELNAME in $DRESNAME"
+    fi
+    [ $((RELPROGRESS % RELPROGSTEP)) -eq 0 ] && echo "[$RELPROGRESS% done]"
+done
+
+rm -f $TMPDUMP $TMPSREL $TMPDREL
+
+exit

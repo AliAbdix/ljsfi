@@ -1,0 +1,213 @@
+<title>Writing your own Pacman packages</title>
+<body background="sky.gif">
+<p>
+<h1><font color=navy>Writing your own Pacman packages</font></h1>
+<p>
+<hr size=5>
+<p>
+     This tutorial is meant to help you get started writing your own packages in Pacman 3.  As an example, we'll
+go through the process of writing a package to install Python version 2.3.4 and it's documentation.
+<p>
+     Start by setting up Pacman in the usual way.  Make a subdirectory <b>cache/</b> to hold the Pacman source 
+code and <b>work/</b> to test the installation.  Edit a file <b>cache/Python.pacman</b> so it contains
+<pre><b><font color="#8B0000">#
+#  Sample Python 2.3.4 installation
+#
+#  author: {you}
+#  date: {date}
+#
+</font></pre></b>
+In the <b>work/</b> directory, do
+<pre><b><font color="#8B0000">% pacman -get ../cache:Python
+% pacman -l -d src
+[*] Python, source cache [../cache]
+</font></pre></b>
+to get started.
+<p>
+    In writing a package, you'll have a good point of view if you imagine that you have been blindfolded and lead to
+a terminal session on an unknown computer running some unknown version of Unix.  Your job is to define all of the 
+conditions necessary to insure that Python version 2.3.4 is correctly installed and setup on your unknown computer.
+By taking this point of view, you will make your package nice and robustly self-contained.
+<p>
+     Before getting to the actual business of installing Python, let's add the following to <b>Python.pacman</b>.
+<pre><b><font color="#8B0000">packageName('Python')
+url('Python','http://www.python.org')
+
+version('2.3.4')
+</font></pre></b>
+The <b>packageName</b> atom fixes the name of the package to be "Python" even if you change the filename to something
+like <b>Python-2.3.4.pacman</b> later on.  This lets you have different versions of Python described in different
+files in the same cache directory.  The <b>url</b> atom is used to provide a convenient pointer for the installer
+when Pacman generates web pages.  The <b>version('2.3.4')</b> atom sets the version string of this package to
+<b>'2.3.4'</b>.  This allows the package to be conveniently selected among other possible Python installations.  To
+try this, in the work area do:
+<pre><b><font color="#8B0000">% pacman -remove
+% pacman -lc ../cache -d version
+    [ ] Python, in cache [../cache]
+               version = 2.3.4
+% pacman -get "../cache:Python | version('2.3.4')"
+% pacman -l -d src
+[*] Python, source cache [../cache]
+         [src] #
+         [src] #  Sample Python 2.3.4 installation
+         [src] #
+         [src] #  author: {you}
+         [src] #  date: {date}
+         [src] #
+         [src] packageName('Python')
+         [src] url('Python','http://www.python.org')
+         [src] 
+         [src] version('2.3.4')
+</font></pre></b>
+to see that you have successfully selected a particular version.
+<p>
+     In this particular case, we're planning to install Python from it's sources taken from a tarball from
+www.python.org.  This is a procedure that might work on any Unix platform as long as basic utilities like
+<b>make</b>, <b>ld</b> and <b>gcc</b> are available and as long as, say 30 Megs of disk space is available.  
+To make sure that this is true, add
+<pre><b><font color="#8B0000">#
+# -- Basic system requirements
+#
+platformGE('unix')
+which('gcc'); which('ld'); which('make')
+freeMegsMinimum(30)
+</font></pre></b>
+to <b>Python.pacman</b>.  To test what we've got so far, you can do <b>-remove</b> and <b>-get</b> as before or just
+do 
+<pre><b><font color="#8B0000">% pacman -update
+% pacman -l
+</font></pre></b>
+To update to the newly modified version.
+<p>
+It may sometimes be helpful to do 
+<pre><b><font color="#8B0000">% pacman -l -d cmp
+[*] Python, in cache [/home/youssef/Pacman/work]
+        [*] AND
+                [*] setcwd /home/youssef/Pacman/work
+                [*] setenv temporary PACMAN_INSTALLATION => /home/youssef/Pacman/work
+                [*] packageName Python
+                [*] cache of origin ../cache
+                [*] pacman source code Python.pacman
+                [*] <a href="http://www.python.org" target="_blank"><font color=#000000>Python</font></a>
+                [*] version = 2.3.4
+                [*] platform >= unix
+                [*] which gcc
+                [*] which ld
+                [*] which make
+                [*] freeMegsMinimum 30 free Megabytes at .
+                [*] setcwd /home/youssef/Pacman/work
+</font></pre></b>
+to view the compiled environmental conditions.  You will see "[*]" wherever the defined condition is satisfied.
+<p>
+     Now let's begin the actual installation by downloading the tarball from www.python.org.  To do this, just add
+<pre><b><font color="#8B0000">#
+# -- Prepare to do the installation
+#
+mkdir('python-2.3.4')
+cd('python-2.3.4')
+downloadUntarzip('http://www.python.org/ftp/python/2.3.4/Python-2.3.4.tgz','PYTHON_TAR')
+mkdir('python')                               # directory which will contain the installed package
+setenvTemp('PYTHON_LOCATION','$PWD/python')   # define a temporary environment variable
+</font></pre></b>
+to <b>Python.pacman</b>.  This code creates a working directory for the package and a directory which will hold the files created by
+the Python make procedure (<b>python/</b>).  The <b>setenvTemp</b> atom defines a temporary environment variable which is available only
+during the package installation and is not defined as part of the setup scripts.  The <b>downloadUntarzip</b> atom is a handy combined
+download/untar which also sets a temporary environment variable <b>$PYTHON_TAR</b> to the path of the location of the top directory of
+the untarred tarball.  Now we are ready to configure and install Python by adding
+<pre><b><font color="#8B0000">#
+# -- Install as usual
+#
+cd('$PYTHON_TAR')
+shell('./configure --prefix="$PYTHON_LOCATION"')  # configure Python to install into the prepared directory
+shell('make')
+shell('make install')
+cd()
+</font></pre></b>
+the <b>shell</b> atoms execute shell commands.  You should note a couple of things about shell commands: the <b>shell</b> atom does not
+send the shell output to the installer's terminal.  This means that if you want to execute shell commands that ask questions, you should
+use <b>shellDialogue</b>.  Also, keep in mind that shell commands cannot affect the environment of the Pacman process that is doing the
+installation.  Setting environment variables in a shell script, for example, will not have an effect for the rest of the installation.
+For more details about shell commands, see the <a href="Shells.html">shell section</a> of the language description.
+<p>
+This time, let's install step by step so that we can see the effect of each Pacman action.  To do this, do
+<pre><b><font color="#8B0000">% pacman -remove
+% pacman -ask action -get ../cache:Python
+</font></pre></b>
+in your work area.  You will be asked permission before each Pacman action is taken.
+<p>
+   Assuming that you have gotten Python to install correctly, you only have to add
+<pre><b><font color="#8B0000">#
+# -- setup the user's environment
+#
+path('python/bin')
+</font></pre></b>
+to add the <b>bin/</b> area to the user/installer's path.  If your package is dependent on other packages, you just use the 
+<b>package</b> or <b>configure</b> atoms as explained in the language syntax.  To try this out, add Python documentation to your package
+by adding.
+<pre><b><font color="#8B0000">#
+# -- add Python standard documentation
+#
+package('Demo:PythonDocs | versionGE("2.3.4")')
+</font></pre></b>
+If you install this, you will see that the csh/sh/py/pl scripts now adjust your PATH variable to use the installed Python.
+<p>
+The complete package now reads
+<pre><b><font color="#8B0000">#
+#  Sample Python 2.3.4 installation
+#
+#  author: {you}
+#  date: {date}
+#
+packageName('Python')
+url('Python','http://www.python.org')
+
+version('2.3.4')
+#
+# -- Basic system requirements
+#
+platformGE('unix')
+which('gcc'); which('ld'); which('make')
+freeMegsMinimum(30)
+#
+# -- Prepare to do the installation
+#
+mkdir('python-2.3.4')
+cd('python-2.3.4')
+downloadUntarzip('http://www.python.org/ftp/python/2.3.4/Python-2.3.4.tgz','PYTHON_TAR')
+mkdir('python')                               # directory which will contain the installed package
+setenvTemp('PYTHON_LOCATION','$PWD/python')   # define a temporary environment variable
+
+#
+# -- Install as usual
+#
+cd('$PYTHON_TAR')
+shell('./configure --prefix="$PYTHON_LOCATION"')  # configure Python to install into the prepared directory
+shell('make')
+shell('make install')
+cd()
+
+#
+# -- Add the python binary directory to the users's path both during installation and in setup
+#
+path('python/bin')
+
+#
+# -- add Python standard documentation
+#
+package('Demo:PythonDocs | versionGE("2.3.4")')
+</font></pre></b>
+<p>
+When you're finished writing a package, it is a good practice to confirm that it removes itself correctly if
+you do <b>% pacman -remove</b>.  Pacman guarantees this for Pacman operations, but if a package uses a
+script, you are responsible for making sure that this is cleaned up when your package is uninstalled.  You
+may occasionally need the <b>uninstallShell</b> atom to do this.
+<p>
+The basic philosophy of Pacman is to guarantee all of the conditions that you desribe above over time.  For instance if you define an
+environment variable with <b>setenv</b> Pacman will make sure that this is not overwritten by some other package.  In this case, for
+example, you have put some binaries in the user's path.  If some other package puts other binaries with the same name in the user's path
+(a different version of Python, for example), then Pacman will complain and refuse to create setup scripts for the installation.
+<p>
+<hr size=5>
+<h3><a href="http://physics.bu.edu/pacman/" target="_blank">Pacman Headquarters</a></h3>
+<p>
+</body>

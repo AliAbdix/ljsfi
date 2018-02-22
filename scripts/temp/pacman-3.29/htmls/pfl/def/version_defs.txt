@@ -1,0 +1,141 @@
+[version]
+[Versions, releases, tags, natively installed software]
+[2]
+
+
+version(versionString)
+versionLE(versionString)
+versionLT(versionString)
+versionGE(versionString)
+versionGT(versionString)
+
+Version lets you assign a version string to a package.  Versions, releases and tags have no intrinsic meaning within Pacman; 
+they are just strings with standard lexical ordering.  Typically, one does something like 
+<b><pre><font color="#8B0000">version('1.1')  # this package is version 1.1
+</font></pre></b>
+in package Foo.  Then, in another package, you can do
+<b><pre><font color="#8B0000">package("Foo | { versionGE('1.0'); versionLT('2.0') OR version('3.0-beta') }")
+</font></pre></b>
+to select particular versions, or, similarly, on the command line
+<b><pre><font color="#8B0000">% pacman -get "Foo | { versionGE('1.0'); versionLT('2.0') OR version('3.0-beta') }"
+</font></pre></b>
+In the Pacman browsing functions, if you do <b>-l -d versions</b> or <b>-lc -d version</b> the versions of packages will be
+displayed.
+
+
+release(releaseString)
+releaseLE(releaseString)
+releaseLT(releaseString)
+releaseGE(releaseString)
+releaseGT(releaseString)
+
+Identical to version above with "release" instead of "version."
+
+
+tag(tagString)
+tagLE(tagString)
+tagLT(tagString)
+tagGE(tagString)
+tagGT(tagString)
+
+Identical to version above with "tag" instead of "version."
+
+
+patch(patchString)
+patchLE(patchString)
+patchLT(patchString)
+patchGE(patchString)
+patchGT(patchString)
+
+Identical to version above with "patch" instead of "version."
+
+
+option(optionString)
+optionLE(optionString)
+optionLT(optionString)
+optionGE(optionString)
+optionGT(optionString)
+
+Identical to version above with "option" instead of "version."
+
+
+versionTuple(versionString[,sep])
+versionTupleLE(versionString[,sep])
+versionTupleLT(versionString[,sep])
+versionTupleGE(versionString[,sep])
+versionTupleGT(versionString[,sep])
+
+Similar to version above except that the version string is interpreted as a list of integers with the usual partial ordering rather than as a character string as
+in <b>version('1.22.11')</b>.  The second argument is an optional separator character which defaults to ".".
+
+
+linuxKernel(versionString)
+linuxKernelLE(versionString)
+linuxKernelLT(versionString)
+linuxKernelGE(versionString)
+linuxKernelGT(versionString)
+
+These atoms let you require versions or version ranges of the standard linux kernel.
+
+
+gccVersion(versionString)
+gccVersionLE(versionString)
+gccVersionLT(versionString)
+gccVersionGE(versionString)
+gccVersionGT(versionString)
+
+These atoms let you require versions or version ranges of gcc.
+
+
+glibcVersion(versionString)
+glibcVersionLE(versionString)
+glibcVersionLT(versionString)
+glibcVersionGE(versionString)
+glibcVersionGT(versionString)
+
+These atoms let you require versions or version ranges of glibc.
+
+
+gccBinary(path,versionString)
+gccBinaryLE(path,versionString)
+gccBinaryLT(path,versionString)
+gccBinaryGE(path,versionString)
+gccBinaryGT(path,versionString)
+
+These let you test if a particular binary has been compiled with gcc versions as indicated.
+
+
+pythonVersion(versionString)
+pythonVersionLE(versionString)
+pythonVersionLT(versionString)
+pythonVersionGE(versionString)
+pythonVersionGT(versionString)
+
+These atoms let you require versions or version ranges of Python.
+
+
+sshVersion(versionString)
+sshVersionLE(versionString)
+sshVersionLT(versionString)
+sshVersionGE(versionString)
+sshVersionGT(versionString)
+
+These atoms let you require versions or version ranges of SSH.
+
+
+perlVersion(versionString)
+perlVersionLE(versionString)
+perlVersionLT(versionString)
+perlVersionGE(versionString)
+perlVersionGT(versionString)
+
+These atoms let you require versions or version ranges of Perl.
+
+
+pacmanVersion(versionString)
+pacmanVersionLE(versionString)
+pacmanVersionLT(versionString) 
+pacmanVersionGE(versionString)
+pacmanVersionGT(versionString)
+
+These atoms let you require versions or version ranges of Pacman.

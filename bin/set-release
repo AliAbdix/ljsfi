@@ -1,0 +1,86 @@
+#!/bin/sh
+
+###################################
+# Set the releases status in a site
+# A. De Salvo - 2006
+# LJSFi framework v1.2
+
+help()
+{
+  echo "Usage: `basename $0` [OPTIONS] -s <status> <release> <site name> <comments>"
+  echo "       OPTIONS:"
+  echo "            -d|--debug             Output debug messages."
+  echo "            -h|--help              Display this help."
+  echo "            -s|--status <status>   Use <status> to update the db"
+  echo "                                   (default: \"$STATUS\")."
+  echo "            -t|--trial             Perform a trial run, no action."
+  exit 0
+}
+
+# Get the command line options
+TRIAL="no"
+STATUS="installed"
+COMMENTS=""
+OPTS=`getopt -o dhs:t -l debug,help,trial,status: -- "$@"`
+if [ $? != 0 ] ; then echo "Terminating..."; exit -1 ; fi
+eval set -- "$OPTS"
+while true ; do
+        case "$1" in
+                -h|--help)         help; shift;;
+                -d|--debug)        DEBUG="yes"; shift;;
+                -s|--status)       STATUS="${2}"; shift 2;;
+                -t|--trial)        TRIAL="yes"; shift;;
+                --)                shift ; break ;;
+                \?)                break ;
+                exit ;;
+        esac
+done
+RELEASE="${1}"
+SITENAME="${2}"
+COMMENTS="${3}"
+if [ "$RELEASE" == "" ] ; then
+    echo "No release specified"
+    help
+    exit -1
+fi
+if [ "$SITENAME" == "" ] ; then
+    echo "No site name specified"
+    help
+    exit -1
+fi
+STATUSVALUES="installed failed removed aborted"
+matched=0
+for STATVAL in ${STATUSVALUES} ; do
+  [ "$STATUS" == "${STATVAL}" ] && matched=1
+done
+if [ $matched -ne 1 ] ; then
+   echo "Invalid status \"$STATUS\". Please use one of the folloing status values"
+   echo $STATUSVALUES
+   exit -1
+fi
+
+#Check the DB status
+$BINPATH/dbcheck
+rc=$?
+[ $rc -ne 0 ] && exit $rc
+
+#Check the proxy status
+$BINPATH/check-proxy
+
+# Get info on the installed releases in the site and build the tag string
+ljsfinfo.py --select="site.cs" --rel=${RELEASE} \
+            --sitename=${SITENAME} --quiet | sed 's#"##g' | \
+while read CS; do
+   if [ "$TRIAL" == "yes" ] ; then
+      echo ljsfinfo.py --status=${STATUS} --cs=${CS} --rel=${RELEASE}
+   else
+      ljsfinfo.py --status=${STATUS} --cs=${CS} --rel=${RELEASE}
+   fi
+   if [ "$?" -eq 0 ] ; then
+      echo "Status set to $STATUS for release $RELEASE in site $SITENAME ($CS)"
+   else
+      echo "Cannot set status $STATUS for release $RELEASE in site $SITENAME ($CS)"
+   fi
+done
+
+exit 0

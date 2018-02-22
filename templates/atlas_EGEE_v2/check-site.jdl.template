@@ -1,0 +1,9 @@
+Executable = "gbb";
+InputSandbox = {"@SCRIPTPATH@/check-site.sh","@SCRIPTPATH@/gbb"};
+OutputSandbox = {"@SITE_CENAME@-site-params.txt","stderr"};
+stdoutput = "@SITE_CENAME@-site-params.txt";
+stderror = "stderr";
+Arguments = "--timing -v -m 300 -p -D 600 -s @GBB_SURL@ $PWD/check-site.sh";
+VirtualOrganisation = "atlas";
+MaxCPUTime=800;
+Requirements = other.GlueCEUniqueId=="@SITE_CS@";

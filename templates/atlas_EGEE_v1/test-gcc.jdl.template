@@ -1,0 +1,9 @@
+Executable = "sw-mgr";
+InputSandbox = {"SCRIPTPATH/sw-mgr"};
+OutputSandbox = {"stdout", "stderr", "install.xml"};
+stdoutput = "stdout";
+stderror = "stderr";
+Arguments = "sw-mgr --test RELNAME -p PHYSPATH --host CENAME --subcluster SCNAME --vo atlas --add-tags --tags RELTAG -P SWNAME -T ext -t ARCH -O opt -m PACMANVERSION --xml install.xml --dump-tags $VO_ATLAS_SW_DIR/tags --post-siteinfo";
+Environment = {"LCG_CATALOG_TYPE=LCGCATALOGTYPE","LFC_HOST=LFCHOST"};
+VirtualOrganisation = "atlas";
+Requirements = other.GlueCEUniqueId=="CEID";

@@ -1,0 +1,271 @@
+#!/bin/sh
+
+####################################
+# Show tags from the DB
+# A. De Salvo - 2012
+# LJSFi framework v1.2
+
+help()
+{
+  echo "HELP"
+  echo "`basename $0`: Show the tag list in <CE FQDN|Resource CS> from the installation DB"
+  echo "Usage: `basename $0` [OPTIONS] <CE FQDN|Resource CS>"
+  echo "       OPTIONS:"
+  echo "            -a|--from-agis               Get the tag info from the Atlas Grid Information System."
+  echo "            -c|--from-cs                 Get the tag info from the CE."
+  echo "            -C|--compare                 Compare the tag info of the CE with the DB."
+  echo "            -e|--exclude-from  <path>    Exclude tags from <path> in comparisons."
+  echo "            -d|--from-db                 Get the tag info from the installation DB."
+  echo "            -i|--from-is                 Get the tag info from the information system."
+  echo "            -m|--missing                 Only select missing tags."
+  echo "            --pattern <pattern>          Select tags based on <pattern>"
+  echo "            -q|--quiet                   Quiet mode (less verbosity)."
+  echo "            -s|--sitename <site-name>    Consider the full site name"
+  echo "            -S|--source <sources>        Use <sources> to compare tags"
+  echo "                                         Example --source 'cs db'"
+  echo "            -t|--tag                     Tag the releases missing in the Installation DB"
+  echo "            --test                       Send tests to retag"
+  echo "            --trial                      Trial run, no submission"
+  echo "            --validate                   Send validation jobs to retag"
+  echo "            --remove-tag                 Send tag removals"
+  echo "            -v|--verbose                 Verbose mode (more verbosity)."
+  echo "            -w|--wrong                   Only select wrong tags."
+  echo "            -h|--help                    Display this help."
+  exit 0
+}
+
+timeout () {
+    perl -e 'alarm shift; exec @ARGV' "$@";
+}
+
+#Check the DB status
+$BINPATH/dbcheck
+rc=$?
+[ $rc -ne 0 ] && exit $rc
+
+# Get the command line options
+SOURCE="db"
+COMPARE="n"
+QUIET="n"
+TAGTASK="publish-tag"
+TAGPATT=".*"
+EXCLUDELIST="${CONFPATH}/autocheck.exclude"
+OPTS=`getopt -o acCde:himqs:S:tvw -l exclude-from:,from-agis,from-cs,from-db,from-is,missing,pattern:,quiet,remove-tag,sitename:,source:,tag,test,trial,validate,verbose,wrong,help -- "$@"`
+if [ $? != 0 ] ; then echo "Terminating..."; exit -1 ; fi
+eval set -- "$OPTS"
+while true ; do
+        case "$1" in
+                -h|--help)         help; shift;;
+                -a|--from-agis)    SOURCE="agis"; shift;;
+                -c|--from-cs)      SOURCE="cs"; shift;;
+                -C|--compare)      SOURCE="is db"; COMPARE="y"; shift;;
+                -e|--exclude-from) EXCLUDELIST="$2"; shift 2;;
+                -d|--from-db)      SOURCE="db"; shift;;
+                -i|--from-is)      SOURCE="is"; shift;;
+                -m|--missing)      TAGMODE="m"; shift;;
+                -q|--quiet)        QUIET="y"; shift;;
+                --remove-tag)      TAGTASK="remove-tag"; shift;;
+                -s|--sitename)     SITENAME="$2"; shift 2;;
+                -t|--tag)          SOURCE="is db"; COMPARE="y"; TAG="y"; shift;;
+                -S|--source)       SOURCE="$2"; shift 2;;
+                --pattern)         TAGPATT="$2"; shift 2;;
+                --test)            TAGTASK="test"; shift;;
+                --trial)           TRIAL="y"; shift;;
+                --validate)        TAGTASK="validation"; shift;;
+                -v|--verbose)      VERBOSE="y"; shift;;
+                -w|--wrong)        TAGMODE="w"; shift;;
+                --)                shift ; break ;;
+                \?)                break ;
+                exit ;;
+        esac
+done
+CS="${1}"
+if [ "$CS" == "" ] ; then
+    echo "No CE FQDN or Resource CS specified"
+    help
+    exit -1
+else
+    INDX=0
+    TEMPTAGS=/tmp/tag.list.$$
+    for SRC in $SOURCE; do
+        let INDX=$INDX+1
+        if [ "$SRC" == "db" ] ; then
+            CE="`echo ${CS} | cut -d: -f 1 | sed 's/ //g'`"
+            if [ "$TAG" == "y" -a "$CS" == "$CE" ] ; then
+                echo "Please specify a Resource CS when fixing tags in a site"
+                exit -1
+            fi
+            TAGTYPE="`get-tagging-info ${CS} | cut -d: -f 1`"
+            rm -f ${TEMPTAGS}
+            if [ -n "$SITENAME" ] ; then
+                ljsfinfo.py --select="(SELECT DISTINCT(tag) FROM release_data WHERE release_data.name=release_stat.name AND tag IS NOT NULL)" \
+                            --sitename="${SITENAME}" --status=installed --quiet 2> /dev/null | \
+                            grep -v None | sed 's#"##g' > ${TEMPTAGS}.tmp
+                ljsfinfo.py --list-tags --sitename="${SITENAME}" | sed -e 's#,#\n#g' -e 's#"##g' | grep -v None >> ${TEMPTAGS}.tmp
+            else
+                if [ "$TAGTYPE" != "ce" ] ; then
+                    ljsfinfo.py --select="(SELECT DISTINCT(tag) FROM release_data WHERE release_data.name=release_stat.name AND tag IS NOT NULL)" \
+                                --cs="${CS}%" --status=installed --quiet 2> /dev/null | \
+                                grep -v None | sed 's#"##g' > ${TEMPTAGS}.tmp
+                    ljsfinfo.py --list-tags --cs="${CS}%" | sed -e 's#,#\n#g' -e 's#"##g' | grep -v None >> ${TEMPTAGS}.tmp
+                else
+                    ljsfinfo.py --select="(SELECT DISTINCT(tag) FROM release_data WHERE release_data.name=release_stat.name AND tag IS NOT NULL)" \
+                                --cename="${CE}" --status=installed --quiet 2> /dev/null | \
+                                grep -v None | sed 's#"##g' > ${TEMPTAGS}.tmp
+                    ljsfinfo.py --list-tags --cename="${CE}" | sed -e 's#,#\n#g' -e 's#"##g' | grep -v None >> ${TEMPTAGS}.tmp
+                fi
+            fi
+            cat ${TEMPTAGS}.tmp | grep "$TAGPATT" | sort | uniq > ${TEMPTAGS}.${INDX}
+            rm -f ${TEMPTAGS}.tmp
+        elif [ "$SRC" == "cs" -o "$SRC" == "agis" -o "$LJSF_CMDSET" == "panda" ] ; then
+            CE="`echo ${CS} | cut -d: -f 1 | sed 's/ //g'`"
+            if [ "$SRC" != "agis" -a "$LJSF_CMDSET" != "panda" ] ; then
+                GRIDNAME="`get-site-info ${CS} | grep -i ^gridName | tail -n 1 | cut -d: -f 2- | sed 's/^ *//g'`"
+                TAGINFO="`get-tagging-info ${CS}`"
+                TAGTYPE="`echo $TAGINFO | cut -d: -f 1`"
+                [ "$VERBOSE" == "y" ] && echo "Grid type is $GRIDNAME"
+                if [ "$TAGTYPE" == "ce" ] ; then
+                    TAGHOST="`echo $TAGINFO | cut -d: -f 2`" 
+                else
+                    TAGHOST="$CE" 
+                    SC="`echo $TAGINFO | cut -d: -f 2`" 
+                fi
+                if [ "$GRIDNAME" == "OSG" ] ; then
+                    TAGUTIL="osg-tags"
+                    unset SC
+                else
+                    TAGUTIL="lcg-tags"
+                fi
+            else
+                TAGUTIL="agis-tags"
+            fi
+            [ "$VERBOSE" == "y" ] && echo "Tagging tool is $TAGUTIL"
+            if [ "$SRC" != "agis" ] ; then
+                if [ -n "$SC" ] ; then
+                    [ "$VERBOSE" == "y" ] && echo "Listing tags for subcluster $SC of $CS"
+                    timeout 300 $TAGUTIL --list --vo ${VO} --sc ${SC}| grep "$TAGPATT"  | sort | uniq > ${TEMPTAGS}.${INDX}
+                elif [ -n "$TAGHOST" ] ; then
+                    [ "$VERBOSE" == "y" ] && echo "Listing tags for cluster $TAGHOST of $CS"
+                    timeout 300 $TAGUTIL --list --vo ${VO} --ce ${TAGHOST} | grep "$TAGPATT" | sort | uniq > ${TEMPTAGS}.${INDX}
+                else
+                    touch ${TEMPTAGS}.${INDX}
+                fi
+            else
+                if [ "$LJSF_CMDSET" == "panda" ] ; then
+                    timeout 300 $TAGUTIL --list --panda-resource ${CS} | grep "$TAGPATT"  | sort | uniq > ${TEMPTAGS}.${INDX}
+                else
+                    timeout 300 $TAGUTIL --list --ce ${CE} | grep "$TAGPATT"  | sort | uniq > ${TEMPTAGS}.${INDX}
+                fi
+            fi
+        elif [ "$SRC" == "is" ] ; then
+            [ "$VERBOSE" == "y" ] && echo "Listing tags for $CS from the IS"
+            timeout 300 lcg-info --vo ${VO} --list-ce --query CE=${CS}* --attrs Tag | \
+                     grep VO-${VO} | grep "$TAGPATT" | sed "s/.*\(VO-${VO}.*\)/\1/" | sed 's/ *$//g' | sort | uniq > ${TEMPTAGS}.${INDX}
+        fi
+    done
+    if [ "$COMPARE" == "y" ] ; then
+        if [ -z "$TAGMODE" -o "$TAGMODE" == "m" ] ; then
+            if [ -s "$EXCLUDELIST" ] ; then
+                TAGNUM="`diff ${TEMPTAGS}.1 ${TEMPTAGS}.2 | grep "^>" | sed 's/^> //g' | grep -v -f $EXCLUDELIST | wc -l`"
+            else
+                TAGNUM="`diff ${TEMPTAGS}.1 ${TEMPTAGS}.2 | grep "^>" | sed 's/^> //g' | wc -l`"
+            fi
+            if [ $TAGNUM -gt 0 ] ; then
+                if [ "$QUIET" == "n" ] ; then
+                    if [ "$TAG" != "y" ] ; then
+                        echo "Missing tags in $CS (please test)"
+                    else
+                        echo "Sending tags for $CS"
+                    fi
+                fi
+                if [ -s "$EXCLUDELIST" ] ; then
+                    diff ${TEMPTAGS}.1 ${TEMPTAGS}.2 2>/dev/null | grep "^>" | sed 's/^> //g' | grep -v -f $EXCLUDELIST > ${TEMPTAGS}.3
+                else
+                    diff ${TEMPTAGS}.1 ${TEMPTAGS}.2 2>/dev/null | grep "^>" | sed 's/^> //g' > ${TEMPTAGS}.3
+                fi
+                if [ "$TAG" != "y" ] ; then
+                    cat ${TEMPTAGS}.3
+                else
+                    TEMPSITEINFO="/tmp/siteinfo.$$"
+                    get-site-info $CE | egrep '^GlueSiteName|^gridName' > $TEMPSITEINFO
+                    SITENAME="`cat $TEMPSITEINFO | grep ^GlueSiteName | tail -n 1 | awk '{print $2}'`"
+                    GNAME="`cat $TEMPSITEINFO | grep ^gridName | tail -n 1 | awk '{print $2}'`"
+                    rm -f $TEMPSITEINFO
+                    cat ${TEMPTAGS}.3 | while read tag; do
+                        RELNAME="`ljsfinfo.py --reltag=$tag --select='DISTINCT(release_data.name)' --quiet | sed 's/\"//g'`"
+                        if [ -n "$RELNAME" ] ; then
+                           REQINFO="`ljsfreq.py --query --reqtype=$TAGTASK --cs=$CS --rel=$RELNAME | cut -d, -f 1,8`"
+                           REQID="`echo $REQINFO | cut -d, -f 1`"
+                           REQSTAT="`echo $REQINFO | cut -d, -f 2`"
+                           if [ -n "$REQID" ] ; then
+                               if [ "$REQSTAT" == "autorun" -o "$REQSTAT" == "accepted" -o "$REQSTAT" == "aborting" ] ; then
+                                   echo "Task $TAGTASK of release $RELNAME still active"
+                               else
+                                   echo "Restarting task $TAGTASK of release $RELNAME (status: $REQSTAT)"
+                                   if [ "$TRIAL" == "y" ] ; then
+                                       echo ljsfreq.py --update --reqid=\"$REQID\" --status=autorun --comments=\"Retagging\"
+                                   else
+                                       ljsfreq.py --update --reqid="$REQID" --status=autorun --comments="Retagging"
+                                   fi
+                               fi
+                           else
+                               echo "Sending tagging of release $RELNAME"
+                               if [ "$TRIAL" == "y" ] ; then
+                                   echo ljsfreq.py --cs=$CS --rel=$RELNAME --reqtype=$TAGTASK --sitename=$SITENAME --status=autorun --grid-name=$GNAME --comments=\"Retagging\"
+                               else
+                                   ljsfreq.py --cs=$CS --rel=$RELNAME --reqtype=$TAGTASK --sitename=$SITENAME --status=autorun --grid-name=$GNAME --comments="Retagging"
+                               fi
+                           fi
+                        fi
+                    done
+                fi
+            fi
+        fi
+        if [ -z "$TAGMODE" -o "$TAGMODE" == "w" ] ; then
+            if [ -s "$EXCLUDELIST" ] ; then
+                TAGNUM="`diff ${TEMPTAGS}.1 ${TEMPTAGS}.2 | grep "^<" | sed 's/^< //g' | grep -v -f $EXCLUDELIST | wc -l`"
+            else
+                TAGNUM="`diff ${TEMPTAGS}.1 ${TEMPTAGS}.2 | grep "^<" | sed 's/^< //g' | wc -l`"
+            fi
+            if [ $TAGNUM -gt 0 ] ; then
+                if [ "$QUIET" == "n" ] ; then
+                    if [ "$TAG" != "y" ] ; then
+                        echo "Wrong tags in $CS (please test)"
+                    else
+                        echo "Sending tags for $CS"
+                    fi
+                fi
+                if [ -s "$EXCLUDELIST" ] ; then
+                    diff ${TEMPTAGS}.1 ${TEMPTAGS}.2 2>/dev/null | grep "^<" | sed 's/^< //g' | grep -v -f $EXCLUDELIST > ${TEMPTAGS}.3
+                else
+                    diff ${TEMPTAGS}.1 ${TEMPTAGS}.2 2>/dev/null | grep "^<" | sed 's/^< //g' > ${TEMPTAGS}.3
+                fi
+                if [ "$TAG" != "y" ] ; then
+                    cat ${TEMPTAGS}.3
+                else
+                    TEMPSITEINFO="/tmp/siteinfo.$$"
+                    get-site-info $CE | egrep '^GlueSiteName|^gridName' > $TEMPSITEINFO
+                    SITENAME="`cat $TEMPSITEINFO | grep ^GlueSiteName | tail -n 1 | awk '{print $2}'`"
+                    GNAME="`cat $TEMPSITEINFO | grep ^gridName | tail -n 1 | awk '{print $2}'`"
+                    rm -f $TEMPSITEINFO
+                    cat ${TEMPTAGS}.3 | while read tag; do
+                        RELNAME="`ljsfinfo.py --reltag=$tag --select='DISTINCT(release_data.name)' --quiet | sed 's/\"//g'`"
+                        if [ -n "$RELNAME" ] ; then
+                           echo "Sending tagging of release $RELNAME"
+                           if [ "$TRIAL" == "y" ] ; then
+                               echo ljsfreq.py --cs=$CS --rel=$RELNAME --reqtype=$TAGTASK --sitename=$SITENAME --status=autorun --grid-name=$GNAME
+                           else
+                               ljsfreq.py --cs=$CS --rel=$RELNAME --reqtype=$TAGTASK --sitename=$SITENAME --status=autorun --grid-name=$GNAME
+                           fi
+                        fi
+                    done
+                fi
+            fi
+        fi
+    else
+        cat ${TEMPTAGS}.*
+    fi
+    rm -f ${TEMPTAGS}.*
+fi
+
+exit

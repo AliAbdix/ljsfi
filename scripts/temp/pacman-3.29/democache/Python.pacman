@@ -1,0 +1,52 @@
+#
+#   This is a typical source style installation.
+#
+#   Saul Youssef, January, 2004.
+#
+packageName('Python')  # a package name is optional, the default is the file name.
+description('Python Compiler','http://www.python.org/')
+
+version('2.3.3-final')
+#
+#  check for stuff in path, check that it's unix, check that there are at least
+#  100 free megs
+#
+which('gcc'); which('make')  # some basic native software is required
+platformGE('unix')           # any unix platform will do
+freeMegsMinimum(100)         # at least 100 Megs must be free at the point of installation
+#
+#   Include another package here consisting of Python documentation
+#
+package('PythonDocs | versionGE("2.3")')
+#
+#   download the tarball or tarballs, unzip
+#
+downloadUntarzip('http://www.python.org/ftp/python/2.3.3/Python-2.3.3.tgz','PYTHON_ROOT')
+#
+#   add a few useful url
+#
+url('contact','http://mailto:youssef@bu.edu')   # contact email
+url('bug tracker','http://sourceforge.net/bug/?group_id=5470')
+#
+#   make a temporary Environment variable that's just used during the installation
+#
+setenvTemp('PYTHON_LOCATION','$PWD') # this because --prefix needs and absolute path
+#
+#   make a new directory to store the installed software
+#
+mkdir('python') 
+#
+#   cd into the untarred directory and configure to install into /python
+#
+cd('$PYTHON_ROOT')
+shell('./configure --prefix="$PYTHON_LOCATION/python"')
+shell('make')
+shell('make install')
+cd()
+#
+#    Add the python binary to the user's path
+#
+path('python/bin')
+
+
+

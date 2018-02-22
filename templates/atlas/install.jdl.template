@@ -1,0 +1,9 @@
+Executable = "gbb";
+InputSandbox = {"@TOOLSPATH@/AtlasInstaller-@INSTALLERVER@", "@TOOLSPATH@/AtlasInstallTools-@INSTALLTOOLSVER@.tar.gz","@SCRIPTPATH@/gbb"};
+OutputSandbox = {"stdout", "stderr"};
+stdoutput = "stdout";
+stderror = "stderr";
+Arguments = "--timing -v -m 300 -p -D 600 -s @GBB_SURL@ -c 1 ./AtlasInstaller-@INSTALLERVER@ @INSTALLTOOLSVER@ --install --vo atlas -V RELEASE --SE CLOSESE -S @SWNAME@ -N 1 -R @SWREVISION@@ARCH@";
+Environment = {"arch=@ARCH@","relarch=@RELARCH@","platform=@PACMANPLATFORM@","PACMAN_VER=@PACMANVERSION@","LCG_CATALOG_TYPE=@LCGCATALOGTYPE@","LFC_HOST=@LFCHOST@","VERAREA=@VERSIONAREA@","ATLAS_FIX64=@ATLASFIX64@","@DBRELEASE@=DB_REL","ATLAS_COMPILER=ATLASCOMPILER","ATLAS_SW_DIR=ATLASSWDIR"};
+VirtualOrganisation = "atlas";
+Requirements = other.GlueCEUniqueId=="@SITE_CS@";

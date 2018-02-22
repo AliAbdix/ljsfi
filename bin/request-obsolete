@@ -1,0 +1,6 @@
+#!/bin/sh
+#autorequest -T removal -o 11.% &> /dev/null
+#autorequest -T removal -o &> /dev/null
+autorequest -T removal -o --no-cvmfs &> /dev/null
+autorequest -T removal -o --has-cvmfs --cvmfs-unavailable &> /dev/null
+exit

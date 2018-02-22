@@ -1,0 +1,72 @@
+#!/bin/sh
+
+################################
+# Get a suitable subcluster name
+# A. De Salvo - 2010
+# LJSFi framework v1.9
+
+help()
+{
+  echo "HELP"
+  echo "`basename $0`: Retrun a suitable subcluster name"
+  echo "Usage: `basename $0` [OPTIONS] <resource name>"
+  echo "       OPTIONS:"
+  echo "            -d|--debug          Output debug messages."
+  echo "            -h|--help           Display this help."
+  exit 0
+}
+
+timeout () {
+    perl -e 'alarm shift; exec @ARGV' "$@";
+}
+
+# Get the command line options
+OPTS=`getopt -o dh -l debug,help -- "$@"`
+if [ $? != 0 ] ; then echo "Terminating..."; exit -1 ; fi
+eval set -- "$OPTS"
+while true ; do
+        case "$1" in
+                -h|--help)         help; shift;;
+                -d|--debug)        DEBUG="yes"; shift;;
+                --)                shift ; break ;;
+                \?)                break ;
+                exit ;;
+        esac
+done
+RESOURCE="${1}"
+
+# Check if a resource has been specified
+if [ "$RESOURCE" == "" ] ; then
+    echo "No resource specified."
+    exit 1
+fi
+
+CENAME="`echo ${RESOURCE} | cut -d: -f 1 | sed 's/ //g'`"
+TMPSITEINFO=/tmp/tmp.site.info.$$
+timeout 120 get-site-info ${RESOURCE} > ${TMPSITEINFO}
+SCN="`grep -i ^GlueSubClusterUniqueID: ${TMPSITEINFO} | tail -n 1 | cut -d: -f 2- | sed -e 's/^ *//g'`"
+SCNAME="ce:$SCN"
+CEHCLUSTER="`grep -i ^GlueCEHostingCluster: ${TMPSITEINFO} | tail -n 1 | cut -d: -f 2- | sed -e 's/^ *//g'`"
+rm -f ${TMPSITEINFO}
+[ -n "$DEBUG" ] && echo $SCNAME
+[ -n "$DEBUG" ] && echo $CEHCLUSTER
+
+if [ -n "$SCN" -a "$CENAME" != "$SCN" ] ; then
+    SCN="`timeout 120 ldapsearch -x -h ${LJSF_DEFBDII}:2170 -b 'o=grid' "GlueServiceDataKey=GlueSubClusterUniqueID:${SCN}" GlueServiceDataKey | grep ^GlueServiceDataKey | cut -d: -f3-`"
+    NUMRTE="`echo $SCN | wc -w`"
+    [ "$NUMRTE" -ge 2 ] && unset SCN
+    [ -n "$SCN" ] && SCNAME="sc:$SCN"
+fi
+
+if [ -z "$SCN" ] ; then
+    THIP="`timeout 30 host $CEHCLUSTER 2>/dev/null`"
+    if [ $? -eq 0 ] ; then
+        SCNAME="ce:$CEHCLUSTER"
+    else
+        SCNAME="ce:$CENAME"
+    fi
+fi
+
+echo $SCNAME
+
+exit 0

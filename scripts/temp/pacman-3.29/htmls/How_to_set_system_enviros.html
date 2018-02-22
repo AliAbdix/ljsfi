@@ -1,0 +1,56 @@
+<title>How to set a system-wide environment variable</title>
+<body background="sky.gif">
+<p>
+<h1><font color=navy>How to set system-wide environment variables</font></h1>
+<p>
+<hr size=5>
+<p>
+When installing software that is intended to be used by anyone on a paricular system, it is sometimes necessary
+to set system-wide environment variables.  Red hat linux and several other operating systems provide an easy way
+to do that. You just put files <b>foo.csh</b> and <b>foo.sh</b> in a special directory <b>/etc/profile.d</b>.
+Using Pacman, one way to do this to bring these files with your installation and place them like so.
+<pre><b><font color="#8B0000">downloadUntar('http://.../foo.tar.gz','TAR') # sets TAR to the untarred top directory
+cd('$TAR')
+cp('foo.csh','/etc/profile.d')
+cp('foo.sh', '/etc/profile.d')
+</font></pre></b>
+You don't have to worry about cleaning up such files.  Pacman automatically takes care of "undo"-ing everything that 
+you have done as long as it isn't a shell command.
+<p>
+Since the above will only work if you are root, it is nicer to do the following
+<pre><b><font color="#8B0000">username('root')
+downloadUntar('http://.../foo.tar.gz','TAR') # sets TAR to the untarred top directory
+cd('$TAR')
+cp('foo.csh','/etc/profile.d')
+cp('foo.sh', '/etc/profile.d')
+</font></pre></b>
+which requires that the installer be root before proceeding.  This way, a non-root user get's a nicer message than
+a failure of the <b>cp</b> action.  If you want to give the installer more information about what's going on here, just do
+<pre><b><font color="#8B0000">{   username('root');
+    downloadUntar('http://.../foo.tar.gz','TAR');
+    cd('$TAR'); cp('foo.csh','/etc/profile.d'); cp('foo.sh', '/etc/profile.d') 
+OR 
+    fail("You must be root to set the system-wide enviros for the FOO package.") 
+}</font></pre></b>
+Now many, but not all operating systems use <b>/etc/profile.d</b> for this purpose.  To fix this, you could use the <b>platform</b>
+atoms to branch depending on the operating system.  A slightly sloppier thing to do is to just test if
+a directory <b>/etc/profile.d</b> exists.  Also, since this action affects the whole system, you might want to ask permission first.
+<pre><b><font color="#8B0000">{ exists('/etc/profile.d') OR fail("No /etc/profile.d directory.  Can't install FOO") }
+{   username('root');
+    downloadUntar('http://.../foo.tar.gz','TAR');
+    {   yes('OK to copy files into /etc/profile.d as part of the installation of FOO?'); 
+        cd('$TAR'); cp('foo.csh','/etc/profile.d'); cp('foo.sh', '/etc/profile.d')
+    OR
+        fail("Permission to copy files to /etc/profile.d has been declined.")
+    }
+OR 
+    fail("You must be root to set the system-wide enviros for the FOO package.") 
+}</font></pre></b>
+Note that this code is safe in the sense that Pacman will never remove files or directories unless it has created them and undoing
+everything on uninstallation is automatic.  Also, the argument to <b>yes</b> above is only asked of the user once.  If the installer installs your package then, removes it and
+re-installs it or if the package is updated, Pacman remembers the answer to <a href="Questions.html">such questions</a>.
+<p>
+<hr size=5>
+<h3><a href="http://physics.bu.edu/pacman/" target="_blank">Pacman Headquarters</a></h3>
+<p>
+</body>

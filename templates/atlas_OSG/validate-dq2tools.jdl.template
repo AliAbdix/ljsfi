@@ -1,0 +1,9 @@
+Executable = "sw-mgr";
+InputSandbox = {"@SCRIPTPATH@/sw-mgr","@SCRIPTPATH@/lcg-tags","@SCRIPTPATH@/dq2tools.validate"};
+OutputSandbox = {"stdout", "stderr", "install.xml"};
+stdoutput = "stdout";
+stderror = "stderr";
+Arguments = "-i @RELNAME@ -l @OSGLOGICALPATH@/latest -p @OSGPHYSICALPATH@/@VERSIONAREA@ -o --validate --use-grid --grid-name @GRIDNAME@ --replicate --snapname @PACKAGE@ --release-ver @SWREVISION@ --host @TAGHOST@ --subcluster @SCNAME@ --vo atlas --require-shfs --disk-free @DISKSPACE@ --add-tags --tags @RELTAG@ -P @SWNAME@ -T ext -t @ARCH@ -O opt -m @PACMANVERSION@ --xml install.xml --site-config $OSG_APP/atlas_app/atlas_rel/AtlasSiteConfig.sh --no-version --setenv DQ2_LOCAL_SITE_ID=@SITE_ALIAS@,LCG_GFAL_INFOSYS=is.grid.iu.edu:2170 --ddm-site @SITE_HOTDISK@ --validation-exe dq2tools.validate @KITCACHE@";
+Environment = {"LCG_CATALOG_TYPE=@LCGCATALOGTYPE@","LFC_HOST=@LFCHOST@","LCG_GFAL_INFOSYS=is.grid.iu.edu:2170"};
+VirtualOrganisation = "atlas";
+Requirements = other.GlueCEUniqueId=="@SITE_CS@";

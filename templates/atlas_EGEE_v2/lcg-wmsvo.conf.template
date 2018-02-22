@@ -1,0 +1,6 @@
+[
+VirtualOrganisation = "atlas";
+NSAddresses = {@NS@};
+LBAddresses = {@LB@};
+MyProxyServer = @MYPROXY@
+]

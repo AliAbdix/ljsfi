@@ -1,0 +1,29 @@
+#!/bin/sh
+
+ljsfreq.py --query --status=autorun | cut -d, -f 1,4,5 | while read DATA; do
+    REQ="`echo $DATA | cut -d, -f 1`"
+    REL="`echo $DATA | cut -d, -f 2`"
+    CS="`echo $DATA | cut -d, -f 3`"
+    RELSTAT="`ljsfinfo.py --select=release_stat.status --cs=$CS --rel=$REL --quiet | sed 's/"//g'`"
+    JOBDATA="`ljsfbkk.py --select=job.id,job.status --request=$REQ --last 1 --quiet`"
+    JOBID="`echo $JOBDATA | cut -d, -f 1`"
+    JOBSTAT="`echo $JOBDATA | cut -d, -f 2 | sed 's/^ *//g'`"
+    if [ "$RELSTAT" != "pending" ] ; then
+        if [ -z "$JOBID" ] ; then
+            echo \'$REQ\' \'$RELSTAT\' \'$REL\' \'$CS\'
+            ljsfinfo.py --status=invalid --rel=$REL --cs=$CS
+        else
+            echo \'$REQ\' \'$RELSTAT\' \'$REL\' \'$CS\' \'$JOBID\' \'$JOBSTAT\'
+            if [ "$JOBSTAT" = "failed" ] ; then
+                ljsfreq.py --update --status=stopped --reqid=$REQ
+                ljsfinfo.py --status=failed  --rel=$REL --cs=$CS
+            elif [ "$JOBSTAT" = "finished" ] ; then
+                ljsfreq.py --update --status=done --reqid=$REQ
+                ljsfinfo.py --status=installed  --rel=$REL --cs=$CS
+                agis-tags --add --rel=$REL -R $CS
+            else
+                ljsfreq.py --update --status=accepted --reqid=$REQ
+            fi
+        fi
+    fi
+done

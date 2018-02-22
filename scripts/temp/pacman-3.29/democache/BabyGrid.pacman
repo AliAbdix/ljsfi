@@ -1,0 +1,40 @@
+#
+#   A sample of some grid related environmental conditions
+#
+contact('Saul Youssef','youssef@bu.edu')
+version('0.0001')
+#
+#	Basic site requirements
+#
+{ platformGE('linux-redhat-7.3') OR platformGE('cygwin') }
+
+gccVersionGE('2.8'); perlVersionGE('5.6.0')
+
+tcpPorts('atlasgrid.bu.edu',80,80)   # internet connectivity
+urlVisible('http://www.yahoo.com')   # http access
+freeMegsMinimum(1000)                # at least 1 G free disk space
+timeErrorMaximum(2.5)                # system clock accurate to 2.5 seconds.
+imageSize(1000000000)                # requires 1G binaries
+openFileDescriptors(1000000000)             # requires lots of open file descriptors
+#
+#   SSH and Globus access required
+#
+sshAccess('youssef','1024 35 156446182877076884111743483968512368132841190088327309117429368903813108555062171370548349826000516953845742166791354992478432216259723848855957176065710175310248493977866046083467100244488437557377254238045891654768105903485549214119383903845668541120658575477274292014426228779125354085698281457330163385399 atlas@doe-dhcp218.bu.edu')
+globusAccess('/DC=org/DC=doegrids/OU=People/CN=Yuri Smirnov 334513',   'smirnov')
+#
+#   Accounts created if they don't already exist
+#
+groupAdd('usatlas')
+userAdd('youssef','usatlas')
+#
+#   Work spaces
+#
+workspace(         'scratch',  'BABY_SCRATCH',  1000,  'youssef',  'temporary')
+workspace(  'Baby Grid data',     'BABY_DATA', 10000,  'youssef')
+#
+#   Send an email if the installation works
+#
+{ yes('OK to send an email to Saul?'); mail('youssef@bu.edu','ok') OR message('No email sent.') }
+
+message('Congratulations, you have joined BabyGrid.')
+

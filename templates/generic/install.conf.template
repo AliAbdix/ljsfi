@@ -1,0 +1,20 @@
+#################################################
+# LJSFi configuration file for @VO@ release @RELEASE@
+# A. De Salvo - 20090715
+#################################################
+
+# Software architecture
+ARCH=@ARCH@
+
+# Release tag
+RELTAG=@RELTAG@
+
+# Minimal installation size (in bytes)
+MIN_INSTALL_SIZE=6000
+
+# GriBB SE used for partial output dumping
+GBB_SURL="@GBB_SURL@"
+
+# Configurations for the gLite WMS
+#   Auto config from DB
+CONFIGVO="--config @WMSCMDCONF@"

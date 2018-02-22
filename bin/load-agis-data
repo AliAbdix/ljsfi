@@ -1,0 +1,7 @@
+#!/bin/sh
+
+#source /afs/cern.ch/user/a/agis/public/AGISClient/agis-1.1/setup.py25.sh
+. /cvmfs/atlas.cern.ch/repo/sw/agis/x86_64-slc5-gcc43-opt/latest/setup.sh
+load-agis-data.py $@
+
+exit $?

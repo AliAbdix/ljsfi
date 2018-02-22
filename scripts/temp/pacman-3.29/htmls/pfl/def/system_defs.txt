@@ -1,0 +1,130 @@
+[system]
+[System properties]
+[4]
+
+
+platform(plat)
+platformLE(plat)
+platformLT(plat)
+platformGE(plat)
+platformGT(plat)
+
+platform lets you make requirements on the basic system architecture. Typical examples are 
+<b><pre><font color="#8B0000">platform('linux-redhat-7.3')  # require RedHat Linux version 7.3
+#
+#- Require RedHat version 7.3-9 or any version of cygwin
+#
+{ platformGE('linux-redhat-7.3'); platformLT('linux-redhat-9') OR platformGE('cygwin') } 
+</font></pre></b>
+You can get a list of supported platforms by doing <b>% pacman -platforms</b>.
+
+tcpPorts(host,portStart,portEnd)
+
+tcpPorts lets you require internet connectivity to <i>host</i> with port range as indicated.  The test for connectivity is done
+once at installation time.
+
+usePort(port)
+
+usePort tries binding a socket to integer port number <i>port</i> as part of the installation.  If this succeed, the condition
+is satisfied.  The test is repeated when -verify is used.
+
+rpm(filename)
+rpmInstalled(filename)
+
+rpm and rpmInstalled let you install an rpm as part of an installation procedure (rpm) or test if an rpm is already installed
+(rpmInstalled).  As with all Pacman operations, if Pacman installs an rpm for you when a package is installed, it will also remove
+it when the package is uninstalled.
+
+
+heapSize(bytes)
+stackSize(bytes)
+imageSize(bytes)
+
+These atoms test the maximum memory sizes on the installing system.  imageSize <i>(bytes)</i> guarantees that 
+a image with size at least <i>bytes</i> can be run.
+
+
+fileSizeSoft(bytes)
+fileSizeHard(bytes)
+fileSize(bytes)
+
+These atoms test maximum allowed file sizes on a system.  fileSize <i>(bytes)</i> guarantees that a file with size
+at least <i>bytes</i> can be created.
+
+
+timeErrorMaximum(seconds)
+
+timeErrorMaximum requires that the system clock on the installing system to be accurate to within
+<i>seconds</i> seconds <i>specified as a floating point number</i>.  This is typically important for distributed 
+computing or grid applications.  The absolute time measurement for timeErrorMaximum is only accurate to about 1 second, so
+there is no point in being more stringent than that.
+
+
+downloadTime(FILE,minimumSeconds)
+
+downloadTime is a network performance test.  
+It requires that the FILE (syntax is the same as in <i>download</i>) 
+be downloaded to the installation site within <i>minimumSeconds</i> seconds specified as a floating point
+number.
+
+
+cpuSecondsSoft(seconds)
+cpuSecondsHard(seconds)
+cpuSeconds(seconds)
+
+Systems sometimes have built in limits on the maximum cpu time a process can used before it is automatically killed.
+These atoms let you require that such limits are greater than <i>seconds</i> seconds.  <i>cpuSeconds</i> requires that the
+minimum of the soft and hard limits be greater than the <i>seconds</i> argument.  As usual, seconds are
+specified as a floating point number.
+
+
+openFileDescriptorsSoft(ndesc)
+openFileDescriptorsHard(ndesc)
+openFileDescriptors(ndesc)
+
+These atoms test the maximum allowed number of open file descriptors on a system.  openFileDescriptors <i>(ndesc)</i> guarantees
+that at least <i>ndesc</i> file descriptors can be open at once.
+
+runningProcess(processName)
+
+runningProcess requires that <i>processName</i> be a currently running process at the time of installation.
+
+
+fileCopyMinimumMegsPerSecond(minimumMegsPerSecond[,numberOfMegs[,path='.']])
+
+fileCopyMinimumMegsPerSecond lets you test disk writing speed at the installation machine.  This requires that 
+a single file of <i>numberOfMegs</i> (defaults to 1000 Megs) must be able to be copied with a speed of at least 
+<i>minimumMegsPerSecon</i> at location <i>path</i>.
+
+
+systemWordSize(wordsizestring)
+
+Specify "32" or "64" to determine the system word size.
+
+
+byteOrder(style)
+
+Specify the system byte order style as in "little".
+
+
+processor(text)
+
+Specify the system hardware as in "i686".
+
+
+systemVersion(plat)
+systemVersionLE(plat)
+systemVersionLT(plat)
+systemVersionGE(plat)
+systemVersionGT(plat)
+
+System version string as returned by the Python platform module.
+
+
+systemRelease(plat)
+systemReleaseLE(plat)
+systemReleaseLT(plat)
+systemReleaseGE(plat) 
+systemReleaseGT(plat)
+
+System release string as returned by the Python platform module.

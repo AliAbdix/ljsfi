@@ -1,0 +1,9 @@
+Executable = "sw-mgr";
+InputSandbox = {"@SCRIPTPATH@/sw-mgr","@SCRIPTPATH@/lcg-tags"};
+OutputSandbox = {"stdout", "stderr", "install.xml"};
+stdoutput = "stdout";
+stderror = "stderr";
+Arguments = "-i @RELNAME@ -l @LOGICALPATH@/@RELNAME@ -p @PHYSICALPATH@/@VERSIONAREA@ -o -P @SWNAME@ -T @RELCATEGORY@ -t @ARCH@ -O opt -m @PACMANVERSION@ --xml install.xml --reinstall @KITCACHE@";
+Environment = {"LCG_CATALOG_TYPE=@LCGCATALOGTYPE@","LFC_HOST=@LFCHOST@"};
+VirtualOrganisation = "atlas";
+Requirements = other.GlueCEUniqueId=="@SITE_CS@";

@@ -1,0 +1,185 @@
+#!/bin/sh
+
+##############################################################
+# System V-style script for autoinstall agent management     #
+#                                                            #
+# (c) Alessandro De Salvo <Alessandro.DeSalvo@roma1.infn.it> #
+#     21 Nov 2006                                            #
+##############################################################
+
+CMD=$1
+shift 1
+
+PIDFILE=$LJSFVARPATH/autoinstall-`uname -n`.pid
+PIDRUNNING="`\ls -d $LJSFVARPATH/autoinstall-*.pid 2> /dev/null`"
+UIPORT="`grep "^uiport.*=" $CONFPATH/autoinstall.conf | sed 's/^uiport *= *\([0-9]*\).*/\1/'`"
+[ -z "$UIPORT" ] && UIPORT="9513"
+
+C_NORMAL="\\033[0;39m"
+C_FAILURE="\\033[1;31m"
+C_SUCCESS="\\033[1;32m"
+
+checkProxy() {
+    check-proxy
+    RETVAL=$?
+    return $RETVAL
+}
+
+start() {
+    checkProxy
+    retcode=$?
+    [ $retcode -ne 0 ] && exit $retcode
+    printf "${C_NORMAL}%-30s" "Starting AutoInstall agent"
+    if [ "$PIDRUNNING" == "" ] ; then
+      UIPORTOPEN="`netstat -ltupn 2>/dev/null | grep ":$UIPORT " | wc -l`"
+      if [ $UIPORTOPEN -gt 0 ] ; then
+        printf "[${C_FAILURE}FAILED${C_NORMAL}]\n"
+        echo "AutoInstall agent not running, but UI port is open"
+      else
+        $BINPATH/$LJSF_CMDSET/autoinstall.py $@
+        RETVAL=$?
+        if [ $RETVAL -eq 0 ] ; then
+          printf "[${C_SUCCESS}  OK  ${C_NORMAL}]\n"
+        else
+          printf "[${C_FAILURE}FAILED${C_NORMAL}]\n"
+        fi
+      fi
+    else
+      printf "[${C_FAILURE}FAILED${C_NORMAL}]\n"
+      RUNHOST="`basename $PIDRUNNING | sed -e 's#^autoinstall-##' -e 's#.pid$##'`"
+      printf "AutoInstall agent already running on %s\n" $RUNHOST
+      printf "Please stop it before or delete the file\n"
+      printf "%s\n" $PIDRUNNING
+      printf "if you think that no agent is running.\n"
+      RETVAL=1
+    fi
+    return $RETVAL
+}
+
+status() {
+    if [ "$PIDRUNNING" != "" ] ; then
+      RUNHOST="`basename $PIDRUNNING | sed -e 's#^autoinstall-##' -e 's#.pid$##'`"
+      PID="`cat $PIDRUNNING`"
+      if [ "$RUNHOST" == "`uname -n`" ] ; then
+        if [ "`ps | grep $PID`" != "" ] ; then
+          printf "AutoInstall agent not running. Removing PID file %s\n" $PIDRUNNING
+          rm -f $PIDRUNNING
+          RETVAL=1
+        else
+          printf "AutoInstall agent running on this node with PID=%d\n" $PID
+          RETVAL=0
+        fi
+      else
+        printf "AutoInstall agent running on node %s with PID=%d\n" $RUNHOST $PID
+        RETVAL=0
+      fi
+    else
+      printf "AutoInstall agent not running.\n"
+    fi
+    return $RETVAL
+}
+
+
+stop() {
+    printf "${C_NORMAL}%-30s" "Stopping AutoInstall agent"
+    if [ -f $PIDFILE ] ; then
+      if [ -s "$PIDFILE" ] ; then
+        PID="`cat $PIDFILE`"
+        if [ "$PID" != "" ] ; then
+          while [ "`ps hp $PID`" != "" ] ; do
+            kill $PID &> /dev/null
+            sleep 1s
+          done
+        fi
+        RETVAL=0
+        printf "[${C_SUCCESS}  OK  ${C_NORMAL}]\n"
+      else
+        RETVAL=1
+        printf "[${C_FAILURE}FAILED${C_NORMAL}]\n"
+      fi
+      rm -f $PIDFILE
+    else
+      RETVAL=1
+      printf "[${C_FAILURE}FAILED${C_NORMAL}]\n"
+      printf "No AutoInstall agent running on this node\n"
+    fi
+    return $RETVAL
+}
+
+
+killProc() {
+    printf "${C_NORMAL}%-30s" "Killing AutoInstall agent"
+    if [ -f $PIDFILE ] ; then
+      if [ -s "$PIDFILE" ] ; then
+        PID="`cat $PIDFILE`"
+        if [ "$PID" != "" ] ; then
+          while [ "`ps hp $PID`" != "" ] ; do
+            kill -9 $PID &> /dev/null
+            sleep 1s
+          done
+        fi
+        RETVAL=0
+        printf "[${C_SUCCESS}  OK  ${C_NORMAL}]\n"
+      else
+        RETVAL=1
+        printf "[${C_FAILURE}FAILED${C_NORMAL}]\n"
+      fi
+      rm -f $PIDFILE
+    else
+      RETVAL=1
+      printf "[${C_FAILURE}FAILED${C_NORMAL}]\n"
+      printf "No AutoInstall agent running on this node\n"
+    fi
+    return $RETVAL
+}
+
+
+watch() {
+    if [ "$PIDRUNNING" != "" ] ; then
+      RUNHOST="`basename $PIDRUNNING | sed -e 's#^autoinstall-##' -e 's#.pid$##'`"
+      PID="`cat $PIDRUNNING`"
+      if [ "$RUNHOST" == "`uname -n`" ] ; then
+        PROCESSNAME="`ps -p $PID -o comm=`"
+        if [ "$PROCESSNAME" == "" ] ; then
+          UIPORTOPEN="`netstat -ltupn 2>/dev/null | grep ":$UIPORT " | wc -l`"
+          if [ $UIPORTOPEN -gt 0 ] ; then
+            echo "AutoInstall agent not running, but UI port is open"
+          else
+            printf "AutoInstall agent not running. Removing PID file %s\n" $PIDRUNNING
+            rm -f $PIDRUNNING
+            PIDRUNNING="`\ls -d $PIDFILE 2> /dev/null`"
+            start
+            RETVAL=$?
+          fi
+        fi
+      else
+        printf "AutoInstall agent running on node %s with PID=%d\n" $RUNHOST $PID
+        RETVAL=0
+      fi
+    fi
+    return $RETVAL
+}
+
+
+case "$CMD" in
+    start)
+        start $@
+        ;;
+    status)
+        status
+        ;;
+    stop)
+        stop
+        ;;
+    killproc)
+        killProc
+        ;;
+    watch)
+        watch
+        ;;
+    *)
+        echo $"Usage: $0 {start|stop|killproc|status|watch} [cmd]"
+        RETVAL=1
+esac
+
+exit $RETVAL

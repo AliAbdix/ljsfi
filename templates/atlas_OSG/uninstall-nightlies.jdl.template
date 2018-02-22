@@ -1,0 +1,9 @@
+Executable = "sw-mgr";
+InputSandbox = {"@SCRIPTPATH@/sw-mgr","@SCRIPTPATH@/lcg-tags"};
+OutputSandbox = {"stdout", "stderr", "install.xml"};
+stdoutput = "stdout";
+stderror = "stderr";
+Arguments = "-r @RELNAME@ -l @OSGLOGICALPATH@/@RELNAME@ -p @OSGPHYSICALPATH@/@VERSIONAREA@ -o -n -P @SWNAME@ -T @RELCATEGORY@ -t @ARCH@ -O opt -m @PACMANVERSION@ --grid-name @GRIDNAME@ --xml install.xml --site-config $OSG_APP/atlas_app/atlas_rel/AtlasSiteConfig.sh";
+Environment = {"LCG_CATALOG_TYPE=@LCGCATALOGTYPE@","LFC_HOST=@LFCHOST@"};
+VirtualOrganisation = "atlas";
+Requirements = other.GlueCEUniqueId=="@SITE_CS@";

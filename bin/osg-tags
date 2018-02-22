@@ -1,0 +1,261 @@
+#!/bin/bash
+
+TAGOPTS="$@"
+
+# Defaults
+[ -z "$VO" ] && VO="atlas"
+
+OPTS=`getopt -o adf:FhlL:prtV -l add,ce:,debug,file:,full,help,list,location:,project:,remove,sc:,tags:,vo:,version -- "$@"`
+if [ $? != 0 ] ; then echo "Terminating..."; exit -1 ; fi
+eval set -- "$OPTS"
+
+# Defaults
+VERSION="osg-tags v0.4 - (c) Alessandro De Salvo <Alessandro.DeSalvo@roma1.infn.it> - 20100608"
+
+showhelp() {
+cat <<EOD
+HELP
+`basename $0`: OSG tag utility
+Usage: `basename $0` [OPTIONS]
+       OPTIONS:
+             -a|--add               Add tags
+             -d|--debug             Print debug messages
+             --ce <cename>          CE FQDN
+             -f|--file <filename>   Use the tag file <filename>
+             -F|--full              Full (long) output
+             -l|--list              List tags
+             -L|--location <path>   Release location path
+             -p|--project <name>    Release project name
+             -r|--remove            Remove tags
+             --sc <scname>          Use subcluster <scname>
+             -t|--tags <tags>       Comma-separated list of tags
+             --vo <voname>          VO name
+             -V|--version           Show the version
+EOD
+}
+
+while true ; do
+    case "$1" in
+        --add|-a)      MODE="add";shift;;
+        --debug|-d)    DEBUG="yes";shift;;
+        --ce)          CE="$2";shift 2;;
+        --file|-f)     TFILE="$2";shift 2;;
+        --full|-F)     TFULL="yes";shift;;
+        --help|-h)     showhelp;exit;;
+        --list|-l)     MODE="list";shift;;
+        --location|-L) LOCATION="$2";shift 2;;
+        --project|-p)  PROJECT="$2";shift 2;;
+        --remove|-r)   MODE="remove";shift;;
+        --sc)          CE="$2";shift 2;;
+        --tags|-t)     TAGS="$2";shift 2;;
+        --vo)          VO="$2";shift 2;;
+        --version|-V)  echo $VERSION;return 0;;
+        --)            shift;break;;
+        \?)            break;
+        exit;;
+    esac
+done
+
+[ -z "$LOCATION" ] && TAGOPTS="$TAGOPTS --location \$OSG_APP/`echo $VO | tr A-Z a-z`_app"
+[ -z "$PROJECT" ]  && TAGOPTS="$TAGOPTS --project ${VO}tags"
+
+if [ -z "$CE" ] ; then
+    echo "No CE name specified"
+    exit 1
+fi
+
+if [ -z "$MODE" ] ; then
+    echo "No action specified"
+    exit 1
+fi
+
+OSGTAGS=/tmp/osg-tags.$$
+cat > $OSGTAGS <<EOD
+#!/bin/sh
+
+OSGTags() {
+    local TU_OPTS=\`getopt -o adf:FlL:prtV -l add,ce:,debug,file:,full,list,location:,project:,remove,sc:,tags:,vo:,version -- "\$@"\`
+    if [ \$? != 0 ] ; then echo "Terminating..."; return -1 ; fi
+    eval set -- "\$TU_OPTS"
+
+    # Defaults
+    local TU_CE=
+    local TU_DEBUG="no"
+    local TU_TFILE=
+    local TU_LOCATION=
+    local TU_MODE="list"
+    local TU_PROJECT=
+    local TU_TAGS=
+    local TU_VER="OSGTags v0.4 - (c) Alessandro De Salvo <Alessandro.DeSalvo@roma1.infn.it> - 20100608"
+    local TU_VO="$VO"
+    local TU_RC=0
+
+    while true ; do
+        case "\$1" in
+            --add|-a)      TU_MODE="add";shift;;
+            --debug|-d)    TU_DEBUG="yes";shift;;
+            --ce)          TU_CE="\$2";shift 2;;
+            --file|-f)     TU_TFILE="\$2";shift 2;;
+            --full|-F)     TU_TFULL="yes";shift;;
+            --list|-l)     TU_MODE="list";shift;;
+            --location|-L) TU_LOCATION="\$2";shift 2;;
+            --project|-p)  TU_PROJECT="\$2";shift 2;;
+            --remove|-r)   TU_MODE="remove";shift;;
+            --sc)          TU_CE="\$2";shift 2;;
+            --tags|-t)     TU_TAGS="\$2";shift 2;;
+            --vo)          TU_VO="\$2";shift 2;;
+            --version|-V)  echo \$TU_VER;return 0;;
+            --)            shift;break;;
+            \?)            break;
+            exit;;
+        esac
+    done
+
+    TU_LOCATION="\`echo \$TU_LOCATION | sed 's#//*#/#g'\`"
+
+    # Check the CLI syntax
+    if [ "\$TU_TFILE" == "" ] ; then
+        if [ "\$OSG_APP" != "" ] ; then
+            if [ ! -d "\$OSG_APP/etc" ] ; then
+                echo "Cannot find dir \$OSG_APP/etc"
+                return 1
+            fi
+            TU_TFILE="\$OSG_APP/etc/grid3-locations.txt"
+        else
+            echo "No output file specified and OSG_APP not defined! Please use --file <output file>."
+            return 1
+        fi
+    fi
+    if [ "\$TU_MODE" != "list" -a "\$TU_TAGS" == "" ] ; then
+        echo "No tags specified! Please use --tags <tag list>."
+        return 2
+    fi
+    if [ "\$TU_MODE" != "list" -a "\$TU_LOCATION" == "" ] ; then
+        echo "No location specified! Please use --location <path>."
+        return 3
+    fi
+    if [ "\$TU_MODE" != "list" -a "\$TU_PROJECT" == "" ] ; then
+        echo "No project specified! Please use --project <path>."
+        return 4
+    fi
+
+    local TU_TAGLINE=""
+    local TU_TAG=""
+
+    # Perform the actions
+
+    # Xin Zhao -- move the lock file to $OSG_APP/\`echo \$TU_VO | tr A-Z a-z\`_app, 
+    # since not all OSG sites allow write permission to the whole \$OSG_APP/etc dir
+    TU_LOCKFILE=\${OSG_APP}/\`echo \$TU_VO | tr A-Z a-z\`_app/\`basename \${TU_TFILE}.lock\`
+    [ "\$TU_DEBUG" == "yes" ] && echo "Using Lockfile \$TU_LOCKFILE"
+    
+    if [ "\$TU_MODE" == "add" ] ; then
+        [ "\$TU_DEBUG" == "yes" ] && echo "Adding tags \${TU_TAGS} to \${TU_TFILE}"
+        if [ -f "\${TU_LOCKFILE}" ] ; then
+            echo "File lock exists: \${TU_LOCKFILE}"
+            echo "Aborting the tag operations"
+            return 10
+        else
+            if [ -f \${TU_TFILE} ] ; then
+                \\cp "\${TU_TFILE}" "\${TU_LOCKFILE}"
+            else
+                touch "\${TU_LOCKFILE}"
+            fi
+            if [ \$? -ne 0 ] ; then
+                echo "Cannot create lock file \${TU_LOCKFILE}"
+                echo "Aborting the tag operations"
+                return 11
+            else
+                for TU_TAG in \`echo \${TU_TAGS} | sed 's/,/ /g'\`; do
+                    TU_TAGLINE="\${TU_TAG} \${TU_PROJECT} \${TU_LOCATION}"
+                    TU_FTAG="\`grep "\${TU_TAG}" "${TU_TFILE}" 2>/dev/null\`"
+                    if [ "\$TU_FTAG" == "" ] ; then
+                        [ "\$TU_DEBUG" == "yes" ] && echo "Adding tag \${TU_TAGLINE} to \${TU_TFILE}"
+                        echo "\${TU_TAGLINE}" >> "\${TU_LOCKFILE}"
+                        if [ \$? -ne 0 ] ; then
+                            echo "Cannot add new tags to file \${TU_LOCKFILE}"
+                            echo "Aborting the tag operations"
+                            rm -f "\${TU_LOCKFILE}"
+                            return 12
+                        fi
+                    else
+                        echo "The tag \${TU_TAGLINE} is already present in \${TU_TFILE}"
+                    fi
+                done
+                \\cp "\${TU_LOCKFILE}" "\${TU_TFILE}"
+                if [ \$? -ne 0 ] ; then
+                    echo "Cannot finalize the update to file \${TU_TFILE}"
+                    echo "Aborting the tag operations"
+                    rm -f "\${TU_LOCKFILE}"
+                    return 13
+                fi 
+                [ "\$TU_DEBUG" == "yes" ] && echo "Tags added succesfully to \${TU_TFILE}"
+            fi 
+            rm -f "\${TU_LOCKFILE}"
+        fi
+    elif [ "\$TU_MODE" == "remove" ] ; then
+        [ "\$TU_DEBUG" == "yes" ] && echo "Removing tags \${TU_TAGS} from \${TU_TFILE}"
+        if [ -f "\${TU_LOCKFILE}" ] ; then
+            echo "Lock file exists: \${TU_LOCKFILE}"
+            echo "Aborting the tag operations"
+            return 20
+        else
+            local TU_FTAG=""
+            [ ! -f "\${TU_TFILE}" ] && touch "\${TU_TFILE}"
+            touch "\${TU_LOCKFILE}"
+            for TU_TAG in "\`echo \${TU_TAGS} | sed 's/,/ /g'\`"; do
+                TU_TAGLINE="\${TU_TAG} \${TU_PROJECT} \${TU_LOCATION}"
+                TU_FTAG="\`grep "^\${TU_TAG}" "\${TU_TFILE}"\`"
+                if [ "\$TU_FTAG" != "" ] ; then
+                    [ "\$TU_DEBUG" == "yes" ] && echo "Removing tag \${TU_TAG} from \${TU_TFILE}"
+                    grep -v "^\${TU_TAG}" "\${TU_TFILE}" > "\${TU_LOCKFILE}"
+                    if [ \$? -ne 0 -a \`cat \${TU_TFILE} | wc -l\` -gt 1 ] ; then
+                        echo "Cannot create lock file \${TU_LOCKFILE} while removing tag \${TU_TAG}"
+                        echo "Aborting the tag operations"
+                        rm -f "\${TU_LOCKFILE}"
+                        return 21
+                    else
+                        \\cp "\${TU_LOCKFILE}" "\${TU_TFILE}"
+                        if [ \$? -ne 0 ] ; then
+                            echo "Cannot finalize the update to file \${TU_TFILE} while removing tag \${TU_TAG}"
+                            echo "Aborting the tag operations"
+                            rm -f "\${TU_LOCKFILE}"
+                            return 22
+                        fi 
+                        [ "\$TU_DEBUG" == "yes" ] && echo "Tag \${TU_TAG} removed successfully from \$TU_TFILE"
+                    fi 
+                else
+                    echo "No tag \${TU_TAG} found in \${TU_TFILE}"
+                fi 
+            done
+            rm -f "\${TU_LOCKFILE}"
+        fi
+    else
+        [ "\$TU_DEBUG" == "yes" ] && echo "Listing tags from \$TU_TFILE"
+        if [ -f "\${TU_TFILE}" ] ; then
+            if [ -n "\$TU_TFULL" ] ; then
+                cat "\$TU_TFILE" | grep "^VO-\`echo \$TU_VO | tr A-Z a-z\`"
+            else
+                cat "\$TU_TFILE" | grep "^VO-\`echo \$TU_VO | tr A-Z a-z\`" | awk '{print \$1}'
+            fi
+            if [ \$? -ne 0 ] ; then
+                echo "Cannot list the tag file \${TU_TFILE}"
+                return 30
+            fi
+        else
+            echo "File not found: \${TU_TFILE}"
+        fi
+    fi
+    return 0
+}
+
+OSGTags $TAGOPTS
+exit \$?
+EOD
+
+chmod +x $OSGTAGS
+globus-job-run ${CE}:2119/jobmanager-fork -s $OSGTAGS
+OTRC=$?
+rm -f $OSGTAGS
+
+exit $OTRC

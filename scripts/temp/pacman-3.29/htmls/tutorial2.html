@@ -1,0 +1,80 @@
+<title>Handling multiple versions of the same software</title>
+<body background="sky.gif">
+<p>
+<h1><font color=navy>Handling multiple versions of the same software</font></h1>
+<p>
+<hr size=5>
+<p>
+It is fairly common to be in a situation where you want to be able to use any of
+several different versions of the same software.  The problem with this in
+Pacman is that different versions of the same software typically are
+incompatible in the sense that they use the same environment variables, put the
+same binaries in the users path etc.  Nevertheless, you can have multiple
+versions of the same software in an installation and chose which version that
+you want to actually setup and use.  This tutorial illustrates a number of
+points:
+<ul>
+<li> How to specify different versions of the same Package
+<li> How to install multiple versions of the same software in the same
+installation.
+<li> How Pacman unifies setup as well as installation and configuration.
+</ul>
+The example we will use is different versions of Python as available in the
+<b>Demo</b> cache.  As we will be doing multiple installs, let's begin by making
+a snapshot so that things go faster.  Do
+<pre><b><font color="#8B0000">% pacman -snap Demo
+</font></pre></b>
+If you browse the snapshot with
+<pre><b><font color="#8B0000">% pacman -d version -lc Demo.snap
+</font></pre></b>
+You'll see that there are three versions of Python packages in the snapshot.
+<p>
+Now let's see what happens if you proceed naively and <b>-get</b> multiple versions of Python.  First try
+<pre><b><font color="#8B0000">% pacman -get "Demo.snap:Python | version ('2.1.3')"
+% pacman -l
+[*] Python, in cache [/home/youssef/Pacman/work]
+           version = 2.1.3
+    [*] PythonDocs, in cache [/home/youssef/Pacman/work]
+               version = 2.1.3
+</font></pre></b>
+Now, however, if you install another version you will see something like this
+<pre><b><font color="#8B0000">% pacman -get "Demo.snap:Python | version('2.2.3')"
+Package [Demo.snap:Python] not [installed]:
+    Can't add [/home/youssef/Pacman/work/python-2.1.3/python-2.1.3/bin] to path variable [PATH]
+        Path [pydoc] in also in [/home/youssef/Pacman/work/python-2.2.3/python-2.2.3/bin].
+        Path [python] in also in [/home/youssef/Pacman/work/python-2.2.3/python-2.2.3/bin].
+        Path [python2] in also in [/home/youssef/Pacman/work/python-2.2.3/python-2.2.3/bin].
+</font></pre></b>
+This is Pacman's way of telling you that there there there is a clash between packages.  In this particular case,
+both Python packages add their <b>/bin</b> directories to the standard Unix <b>$PATH</b> with a Pacman <b>path</b>
+statement.  The two bin directories both contain <b>pydoc</b>, <b>python</b> and <b>python2</b> and one or the
+other will be ignored.  To see how to solve this, let's start again by first doing 
+<pre><b><font color="#8B0000">% pacman -remove
+</font></pre></b>
+and then <b>-install</b>-ing the three packages one at a time rather than using <b>-get</b>.  Do
+<pre><b><font color="#8B0000">% pacman -install "Demo.snap:Python | version('2.1.3')"
+% pacman -install "Demo.snap:Python | version('2.2.3')"
+% pacman -install "Demo.snap:Python | version('2.3.4')"
+</font></pre></b>
+and you will find that this works.  The reason is that <b>-get</b> attempts to create a coherent total environment
+for the installation and create setup scripts while <b>-install</b> does not.  Now you have three versions of
+Python installed in your installation.  How, however, to do you set up to use a particular version?  The answer is
+shown in the figure.
+<p>
+<img src="fig2.gif" height=500 width=700>
+<p>
+If the installation you have created is <b>../work</b>, cd elsewhere and do
+<pre><b><font color="#8B0000">% pacman -get "../work:Python | version('2.2.3')"
+</font></pre></b>
+just as if you were installing the software.  Although nothing is actually installed, Pacman creates a consistent
+environment for you, using the contents of <b>../work</b> and creates setup scripts that do the right things to use
+the software in the original installation.
+<p>
+     This tutorial illustrates the sense in which "setting up" software is a special case of installation from the
+Pacman point of view.  With Pacman, installation, configuration and setup are all done with within the same
+framework.
+<p>
+<hr size=5>
+<h3><a href="http://physics.bu.edu/pacman/" target="_blank">Pacman Headquarters</a></h3>
+<p>
+</body>

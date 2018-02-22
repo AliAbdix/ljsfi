@@ -1,0 +1,28 @@
+<title>Source caches</title>
+<body background="sky.gif">
+<p>
+<h1><font color=navy>Source Caches</font></h1>
+<p>
+<hr size=5>
+<p>
+A "source cache" in Pacman is basically a URL or location in your file system containing Pacman source
+code (files ending in ".pacman").  A typical example is the <b>BU</b> cache.  If you do
+<pre><b><font color="#8B0000">% pacman -registry
+</font></pre></b>
+You will see that the symbolic name BU is mapped to a URL and you'll see information about who manages
+this cache.  If you open this URL in your web browser, you'll see that it's just a directory
+tree containing Pacman source code files.  
+<p>
+The main difference in source caches in Pacman 3 are:
+<ol>
+<li> You can access source caches via SSH and Globus as well as via http.
+<li> The symbolic cache names like <b>BU</b> can be defined in the language.
+<li> Different versions of a package may appear in the same cache with different file names.
+</ol>
+As before, the manager of a cache may use subdirectories.  A typical good use of subdirectories is to
+put typically installed top level packages at the top and put dependent packages in subdirectories.
+<p>
+<hr size=5>
+<h3><a href="http://physics.bu.edu/pacman/" target="_blank">Pacman Headquarters</a></h3>
+<p>
+</body>

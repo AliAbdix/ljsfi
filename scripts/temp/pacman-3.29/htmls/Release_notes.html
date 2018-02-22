@@ -1,0 +1,623 @@
+<title>Release Notes</title>
+<body background="sky.gif">
+<p>
+<h1><font color=navy>Release Notes</font></h1>
+<p>
+<hr size=5>
+<p>
+<ul>
+<li> Pacman-3.29, Jul 09, 2009
+<ul>
+<li> Fixed a problem with -allow any-platform pointed out by Asoka De Silva.
+<li> Added am-TRIUMF and TRIUMF symbolic names for Asoka.
+</ul>
+<li> Pacman-3.28, May 20, 2009
+<ul>
+<li> Change update behavior so that if a package failed to update, Pacman ends with an error rather than trying to recover.
+<li> Give an error instead of handing for the obsolete timeErrorMaximum atom.
+<li> Added the BIRN symbolic cache name for J.P. Navarro of ANL.
+<li> Improve which atom, code contributed by Scot Kronenfeld of U.W.
+<li> Added @@PLATFORM@@ macro for VDT, code contributed by Scot Kronenfeld of U.W.
+<li> Bug fix in shellout.log output, code contributed by Scot Kronenfeld.
+<li> Improve perlVersion atom, code by Scot Kronenfeld.
+<li> Add -arch switch and associated config file for VDT, code by Scot Kronenfeld.
+<li> Refine detection of MacOS versions for VDT, code by Scot Kronenfeld.
+<li> Remove warning messages which occur for Python 2.6.
+<li> Fix "lazy Package" message when a package is not found.
+<li> End with an error message for Python 3.0.
+<li> Added -allow any-platform to ignore the platform used when creating an installation. Suggested by Asoka De Silva.
+<li> 
+</ul>
+<li> Pacman-3.26, June 10, 2008
+<ul>
+<li> Code speedups provided by Alain Roy are included.
+<li> Improvements made to "flickering" default output.
+<li> Improved errors when using Pacman in an installation  where you don't have read access to the installation (thanks to Marco Mambelli).
+<li> Fixed bug which occured if perl is in the installers path but perl -v returns with an error (thanks to Scot Kronenfeld for pointing this out).
+<li> Patch: added the fact that IFIC-SL-4 is a clone of SL-4 at the request of Javier Sanchez Martinez.
+<li>
+</ul>
+<li> Pacman-3.25, April 22, 2008
+<ul>
+<li> Pacballs may now be installed in existing installations (thanks to Stan, Alessandro & Xin of ATLAS for
+the suggestion).
+<li> Pacballs now ignore the platform when they install allowing for the possiblity of easy installation
+of pacballs many years into the future when current OSs won't be available.
+<li> Pacball scripts are simplified and adjusted with the view towards possible installation many years in the future
+when current OSs may not be available.
+<li> If you're managing a cache and put a file 'error.txt' in it, the contents of this file appear
+at the end of any Pacman error message if one of your packages fails to install.  This let's you 
+deliver custom messages to people installing your software.  Thanks to the VDT guys for the suggestion.
+<li> option('error:MESSAGE') lets you customize error messages for individual packages.
+<li> Added support for Fedora 8 at Alessandro de Salvo's suggestion.
+<li> Added support for Ubuntu 8 at Marian Klein's suggestion.
+<li> The freedisk atom now assumes that there is a large amount of free disk space on platforms where freedisk does
+not work properly (including at least Mac-G4 and some virtual machines).  Thanks to Isabel Trigger and Austin Napier for
+pointing out the problem.
+<li> Fix bug where detection of wget wasn't working on some OSs including OS/X.  Thanks to John Kewley and
+Alain Roy for reporting the problem.
+</ul>
+<li> Pacman-3.24, February 27, 2008
+<ul>
+<li> Fix a bug introduced in 3.22 causing a "contact Pacman headquarters" error
+message when trying to remove a package which doesn't exist.  The error is harmless other than
+giving the incorrect error.  Thanks to Asoka De Silva for reporting the problem.
+</ul>
+<li> Pacman-3.23, February 4,2008
+<ul>
+<li> Fix a benign bug introduced in 3.22.  The bug caused a package A to be unremovable if B depends on A
+and is updated so that B no longer depends on A.
+</ul>
+<li> Pacman-3.22, January 17, 2008
+<ul>
+<li> Improved error messages when attempting to remove a package that is depended on by other packages in an
+installation.  Thanks to Scot Kronenfeld for noticing the problem.
+<li> Use -allow tar-overwrite when pacballs are executed.  This is particularly useful for ATLAS.  Thanks to Martijn Gosselink for pointing this out.
+<li> Improved http error messages.
+<li> Improve behavior of -allow no-http-cache when used with squids.  Thanks to Steve Timm for the reminder of this issue.
+<li> Improve error message on ^C during download.
+<li> Trust and tar-overwrite questions are now "y/n/yall".
+</ul>
+<li> Pacman-3.21, August 22, 2007
+<ul>
+<li> Fixed a bug in the setup pointed out by Alain Roy.  The bug caused setup commands
+to be put into setup.csh and setup.sh even if the setup atom was not reached in the
+installation.
+<li> Made clone platforms equivalent
+<li> Improved error message if -http-proxy is used before an installation exists.
+<li> Fixed -pretend-platform so that it issues an error message if it's not the first command. 
+Thanks to Michael Thomas for pointing this out.
+<li> Allow extraneous slashes in URLs.
+<li> 
+</ul>
+<li> Pacman-3.20, August 21, 2007
+<ul>
+<li> Move LDG cache for Gregory Mendell.
+<li> Add date to pacball output file name.
+<li> Renamed am-UM at the request of Edward Diehl.
+<li> Add IFIC-SL platform as requested by Javier Sanchez Martinez.
+<li> Speed up parser with code contributed by Alain Roy.
+<li> -allow lock-override was mistakenly commented.  Fixed in a patch to 3.20.  Thanks to Manuel Gallas for noticing!
+<li> Fix a problem with pacballs where an installation specifying the full path
+of a pacball fails.  Installation by "bash [pacball]" or via a relative path is
+not affected.
+<li> Add JAB cache.
+<li> Fix source file protection problem with makePacball.py.
+<li> Fix quoted version problem in making Pacballs noticed by Xin Zhao of BNL.
+<li> Added -allow no-http-cache as suggested by Shunwei Ye of BNL.
+<li> Fixed platform problem with AIX noticed by Alain Roy.
+<li> Fixed 3.19->3.20 database transition complaint noticed by Isabell Trigger.
+<li> Replaced use of zcat as suggested by Kevin Flasch (UW) and Ray
+Plante (NCSA).  zcat was causing problems on Solaris.
+<li> Fixed bug in pre and post setup scripts.  Thanks to Andrew Sharpe for pointing this out.
+<li> Added Gentoo to supported platforms.  Fixed problems with Ubuntu and Yellow Dog OS recognition.
+<li> Added -pacball for generating self installing "pacball" scripts that
+install software without needing Pacman or internet access.
+<li> -lock-override no longer is saved as an allow option and must be supplied for each operation that voluntarily
+overrides a cache that has been locked by it's owner.
+<li> Improved error messages generated via wget.
+<li> Made improvements in rpm handling.
+</ul>
+<li> Pacman-3.19.1, January, 19 2007
+<ul>
+<li> Fixed a bug noticed thanks to both Emil Obreshkov (CERN) and Patrick McGuigan (UTA).  This bug affected updating for
+packages in an unused OR branch.  The symptom is errors of the form "Can't find [some-package-name]." causing the update to fail. 
+If you haven't seen this problem, it is only necessary to update your Pacman.  If the problem has happened for you, you may have
+to re-install.  This should not affect OSG or VDT installs.
+<li> Fixed benign typo in error message.
+</ul>
+<li> Pacman-3.19, October 29, 2006.
+<ul>
+<li> Fixed a problem notice by Sigve Haug caused if your userid is not in the passwd file.
+<li> Add am-UM, am-RAL default symbolic cache names.
+<li> Rename am-CERN symbolic name and remove am-CERN-afs.
+<li> Improve miscellaneous error messages including "download failure" message.
+<li> Fixed a ^C vunerability that Edward Diehl (UM) reported.
+<li> Automatically use urllib2 if wget is not in the installer's path.
+<li> Remove the -allow save-setups option as this behavior is now the default, i.e. setup scripts are not removed while an installation is being modified.
+<li> Add pre- and post- setup code in all Pacman generated setup scripts.
+<li> No longer put the /src directory in PYTHONPATH of the user to avoid interference with other applications.
+<li> Improve platform detection and handling.  RHEL-4 no longer satisfies RHEL-3 etc.  Only
+coarsest OS version number is considered (e.g. RHEL-4 and RHEL-4.1 are considered identical).  More
+platforms are recognized including Unbuntu, Yellow Dog and RHEL variants making -pretend-platform
+necessary less often.
+</ul>
+<li> Pacman-3.18.5, June 26, 2006
+<ul>
+<li> Snuck in am-IU at the last minute.  Thanks to Kristy Kallbac-Rose for setting it up.
+<li> Added the ITB, am-CERN, am-CERN-afs and modified the ATLAS symbolic name.
+<li> Removed the gcc version in -version as this was confusing people into thinking that it's the gcc version on their system
+(it's actually the gcc version used to build python).
+<li> Catch and ignore assertion errors in the python urllib2 library causing hung machines to cause Pacman to
+end with an abort exception.
+<li> Use urllib2 as a backup if wget is not available.
+</ul>
+<li> Pacman-3.18.4, May 16, 2006
+<ul>
+<li> Minor fix to decrease memory use, particularly in Atlas installs.  3.18.3 briefly needed
+1100M to install a standard Atlas release (this situation existed since 3.18.2).  3.18.4 peaks at about 150M during an Atlas full
+release install.  Thanks to Paolo Calafiura for pointing out the problem.
+</ul>
+<li> Pacman-3.18.3, May 8, 2006
+<ul>
+<li> Bug fix found my Emil.  This was a bug in the error message that occurs if untarring a tarball would place a file in a path
+where there is an existing directory of the same name.
+</ul>
+<li> Pacman-3.18.2, May 7, 2006
+<ul> 
+<li> Added feedback, logging and extra checking for wget downloads.
+<li> Added -bell to beep when a Pacman command is finished.
+</ul>
+<li> Pacman-3.18.1, May 2, 2006.
+<ul>
+<li> Fixed a problem where you can't do -lc etc. on an installation that you don't have write access to the directory (pointed out by Simon George).
+<li> Fixed the am-UCHEP symbolic name.  Added am-IU symbolic name.
+<li> -retry option now gets used by both wget and urllib2 access methods.
+<li> Fixed one more update problem noticed by S.Y.
+</ul>
+<li> Pacman-3.18, April 28, 2006.
+<ul>
+<li> Fixed a problem causing mirrors created on 64 bit machines to be unreadable.
+<li> Use wget rather than urllib2 as the default for downloading.  -allow urllib2 forces urllib2.
+<li> Improved error messages related to putting Pacman source files in the current working directory.  Pacman now ignores a Pacman
+installation if you mistakenly make it in a source cache.
+<li> Trust of a .caches file or mirror now implies trust of the dependent caches without asking individually.
+<li> Add -allow extract-overwrite to allow files to be overwritten when using -extract-downloads.
+<li> Added -tar-overwrites option.  Use this after an installation to find out the current overwrite situation.
+<li> Changed tar-overwriting defaults for ATLAS.
+<li> Fixed a bug causing Pacman not to correctly handle situations where tarballs untar into each others subdirectories.  Thanks to Grigori and Emil for noticing this.
+<li> Renamed the Cookie module to avoid clashes with the standard Python library (thanks to Conrad Steenberg for noticing).
+<li> Added CentOS as a supported Platform as requested by Terrence Martin.
+<li> Fixed a bug causing a traceback rather than a nice message on one of the grandcentral machines.
+<li> Evaded an apparent Python bug in shutil causing failures for some platforms.
+<li> Fixed a bug affecting -update-check of package statements inside an OR
+branch causing Pacman to think that there is an update available even when there
+isn't.
+</ul>
+<li>Pacman-3.17 March 14, 2006.
+<ul>
+<li> Fixed a problem the Jerrod noticed causing "contact Pacman headquarters."
+<li> Added IFIC Scientific Linux.  Thanks for the assist from Belen Salvachua Ferrando.
+<li> Using -allow trust-all-caches now also suppresses the question asking to replace a
+symbolic cache name when using the register atom.
+<li> Fixed a slightly no-standard command line switch in runningProcess that caused this to fail on some OSs.
+<li> Fixed a minor problem with CP.
+<li> Fixed a bug in mirrors causing .cache files with explicit http addresses in them not to mirror properly.
+<li> Fixed a problem in .caches files where in-line comments didn't work.
+<li> Turned of retrying downloadUntarzip as this doesn't work often enough to justify the confusion it causes when it doesn't work.
+<li> Improved the time stamps in the o..pacman..o/logs/pacman.log file - suggestion by Alain Roy and Tim Cartwright.
+<li> Improved the default verbose messages on -update and -update-check suggested by Alain.
+<li> Added some improved error messages when running out of disk space during untarring.
+<li> Fixed a bug introduced in 3.16 which caused installing from existing installations to fail.  Thanks to Alessandro de Salvo for noticing.
+<li> Fixed a bug caused a "Contact Pacman Headquarters" message if you use 3.16.1 on an old (<3.13) installation. Thanks to Rolf Seuster for reporting the problem. 
+<li> Added IEPM-BW default symbolic cache name (Jerrod Williams managing).
+<li> Bug fix in the platform atom causing platform to behave like platformGE.  Noticed by Nate Mueller.
+<li> Major new features, particularly added <a href="Mirrors.html">mirrors</a> and new-style snapshots.
+<li> Fixed -allow bad-paths, which was being ignored.
+<li> Allow files containing "{" in tarballs.
+<li> Fixed detection of Fermi SL 3.0.3 and the fact that -platforms doesn't work if your plaform isn't recognized.  Thanks to Jason Harrington for pointing this out.
+</ul>
+<li>Pacman-3.15.  November 29, 2005.
+<ul>
+<li> Fixed the behavior of "lock" files as suggested by Emil Obreshkov.  You can now put a file called "lock" in any
+subdirectory of a cache to lock individual subdirectories.
+<li> Added -resume as suggested by Dieter Best.
+<li> Added BNL symbolic cache name.
+<li> Possibly fixed the pythonVersion() problem that Nate reported.
+<li> Fixed a bug notice by Alan Sill causing "Error in Pacman" message if you
+use Pacman 3.14.1 on an old existing installation.
+<li> Added a small change is SuSE platform detection so that "SUSE" is recognized as well as "SuSE" -
+requested by Alain.
+<li> Let -help work even on an unsupported platform.  Thanks to Dan Yocum for noticing the problem.
+<li> Removed --no-same-owner tar option for TeraGrid.
+<li> Fix -v shell-out which wasn't showing the shell output from shell atoms.
+<li> Check for non-standard special characters in tarball file names was not being turned off by -allow bad-tar-filenames and it was checking for some special
+characters which are actually OK.  Thanks to Horst Severini for noticing.
+<li> Remove shelve as the default database.
+<li> Re-fixed the protection atoms.
+</ul>
+<li>Pacman-3.14. October 5, 2005.
+<ul>
+<li> Check for non-standard special characters in filenames in tarballs.  Thanks to Diana Scannicchio for reporting this
+problem.
+<li> Added -ask tar, -ask unzip sticky switch options.
+<li> Settable http retries now also sets the number of download/unzip retries as a way of dealing with NFS problems experienced at some ATLAS sites.
+<li> Add support for OSF1 (for TeraGrid), SL-4 family and "BU-Linux."
+<li> Removed the possiblity that ^C at the wrong time could cause a corrupted database.
+<li> Removed dependence on PWD environment variable in setup.csh (but not sh).
+<li> Pacman now uses GNU tar if any of tar/gtar/gnutar are actually GNU tar (see, also -allow).  This is for TeraGrid.  Thanks to JP Navarro for the suggestion.
+<li> Fixed a bug giving a "call Pacman headquarters" error if you used <a href="basic.html#freeDisk2">freeDisk</a> on a non-linux os.  Thanks to Jason Brechin for noticing.
+<li> Changed the value of VDT for Nate and Alain.
+<li> Fixed a problem noticed by Nate causing confusing warning messages if an OR branch that Pacman can figure
+out will not be executed contains a package.
+<li> Fixed a problem where -remove-all refused to remove a package if the package had dependent packages which had not been found
+(this did not affect -remove).
+<li> -snap -out path or -o path used to ignore the full path of the specified output and always create the snapshot locally.  It's fixed now.
+<li> Setup.csh(sh) were broken in the Sept.13 pre-release.  There're fixed now. Thanks to JP Navarro for noticing (they got broken by a mail program adding
+invisible characters that bothered only some shells!).
+<li> Added <a href="version.html">glibcVersion, glibcVersionLE</a> as well as gcc version as suggested by Nate Mueller.
+<li> freeMegsMinimum incorrectly didn't take a default second argument.
+<li> Fixed a problem where ^D in answer to questions caused a traceback instead of a nice error.
+<li> Add option -allow save-setup to save setup scripts before replacing or removing them.  Thanks to Lisa Giacchetti for this suggestion.
+<li> Fixed problem in setup scripts that gave an awk error on Solaris.  Thanks to Scott Koranda for pointing this out.
+<li> Added <a href="http://atlas.bu.edu/caches/registry/E/htmls/registry.html">TeraGrid</a> symbolic cache name to the default registry.
+<li> Add <a href="system.html">usePort</a> atom as suggested by Nate Mueller.
+<li> Add an optional argument to the <a href="fileaccess.html">AbsPath</a> atom.
+<li> Improve error messages when packages are not found or caches aren't specified.
+<li> Providing no options for a -v-like command line switch now results in an error message rather than no action.
+<li> Added <a href="basic.html">setenvShellTemp</a> atom as suggested by Nate.
+<li> Fixed broken link to grid.html page in the documentation.
+</ul>
+<li>Pacman-3.13.1.  August 5, 2005.
+<ul>
+<li> Fixed ChownR which was not changing ownership.
+<li> Removed the assumption that "." is in the users path in the setup scripts.  Thanks to John Weigand for noticing.
+<li> Added the absPath() atom.  This requires that a Pacman installation begin in an absolute non-symlinked location.
+<li> Fixed shellDialogue so that it gives continuous output to sysout.  Thanks to Nate Mueller for noticing.
+<li> Removed erroneous include of bsddb module (not available on all Python installations).  Thanks to Rolf Seuster for noticing.
+<li> -domain uses -dom all by default.
+<li> Redefined the ATLAS symbolic cache name to point to their default SLC3 cache.
+<li> Add darwin-10.X platforms thanks to Nate Mueller (see % pacman -platforms).
+<li> Replace timeErrorMaximum so that it doesn't depend on ntdupdate any more (John Brunelle).
+<li> Replaced main database attempting to avoid NFS problems reported by Simon, Grigori and Jorgen.  3.13 reads either the old or new database. 
+Conversion from 3.12 databases is unnecessary.
+<li> Improved initial setup.csh(sh) scripts (John Brunelle).  Now a) only the initial <b>source setup.csh(sh)</b> has to be in the untarred top level
+directory, after this you can source the setup scripts from any location, b) the initial setup installs Python if necessary without asking 
+any questions c) the initialization procedure works correctly even if there is no Python available at all.
+<li> Added optional third argument to <a href="basic.html#path2">path</a> to turn off path clash detecting.  Thanks to Christian for pointing out the need for this.
+<li> Added optional third argument to <a href="basic.html">textFile</a>.  Thanks to Jason Brechin for the suggestion.
+<li> Fixed a problem where tarballs created by <b>tar -cvf ./*...</b> weren't handled correctly.
+<li> Improvements to alreadyInstalled, runningProcess, askUntilFileExists.
+<li> Deconfused a Pacman version error message pointed out by Emil Obreshkov.
+<li> Improved -help output and -def speed.
+<li> Improve -verify and -v tarfiles feedback.
+<li> Sped up installation cache database access.  Thanks to Rob Gardner for noticing this problem.
+<li> Improved handling of Rocks-3.
+<li> Fixed a problem where Pacman could not remove the Pacman installation which was currently being executed.
+<li> Fixed a bug in configure(...) causing "looping packages" on uninstallation.  Thanks to Valerie Fine of STAR for noticing this.
+<li> Various small documentation improvements.
+<li> Fixed setOwnerExecute, setGroupExecute, etc.
+</ul>
+<li>Pacman-3.12. June 8, 2005.
+<ul>
+<li> An <a href="fncn_index.html">index</a> for all Pacman language elements added to the documentation (by John Brunelle).
+<li> New platforms: FreeBSD, IRIX, Sun, Rocks, SL, SLC, Fermi-SL (see -platforms for a complete list).
+<li> Improved -platforms output; added -platform switch (see -help).
+<li> Added -pretend-platform.
+<li> -setups now controls what kind of setup scripts you get.
+<li> Fixed a number of typos in the documentation found by John Brunelle.
+<li> Fixed a bug in configure(...) and duplicates in setup.csh scripts noticed by Nate Mueller.
+<li> Added <a href="basic.html">setenvShell</a> - a suggestion of JP Navarro of ANL.
+<li> Improved -d cmp display of system property atoms.
+<li> Fixed a couple of typos in the documentation.
+<li> Fixed a bug in workspace which didn't write to it's perl setup script.
+<li> Fixed a bug where inserting comments in Pacman source code caused Pacman to believe that the package had changed and had an available update.
+<li> Add -single option for -update.
+<li> Added default symbolic cache names for LDR, GridCat, OSG.
+<li> Fixed missing relation SLC-3<=SLC-4 in platform representation - noticed by Shawn McKee.
+<li> Allow relative path names in cache lists.
+<li> Extend <a href="system.html">rpmInstalled</a> to work for both rpm package names and full rpm file names.  Thanks to Shawn McKee for the suggestion.
+<li> Fixed a bug in softLink found by Scott Koranda.
+<li> Fixed linuxKernel which was not working correctly on non-RH systems.  Noticed by Scott.
+<li> Fixed a problem where if a package has an unresolved dependency, it can't uninstall.
+<li> Fixed a problem with downloading noticed by JP Navarro of ANL.
+<li> Added proxies, authenticated proxies and -v proxy.  Thanks to Gerson Galang and Sam Moscwa.
+<li> Fixed missing -v retry option noticed by Alain Roy.
+<li> Added platform detection for Rocks (thanks to Nate Mueller).
+<li> Fixed bug introduced in 3.11 where downloadUntar('xxx.tar') downloaded but did not untar tarballs.  Noticed by Jean-Paul Navarro.
+<li> In downloadUntar(<i>path</i>) <i>path</i> is interpreted as a relative path of a tarball at the remote cache rather than a local path on the installer's machine.
+<li> Add -allow trust-all-caches.
+<li> Protected installation database against end of disk errors and others which happened while the database is being written.
+<li> Added <a href="Mirrors.html">Mirror caches</a> (turned off for 3.12 as I want to re-do the format somewhat).
+<li> Improved handling of html download failures.
+<li> Fixed missing compilation check of argument to the version atom, noticed by Christian Arnault.
+<li> Fixed -clear-registry.  Problem noticed by Christian Arnault.
+<li> Improved registry display.
+<li> Depth first updating.
+<li> Fixed two bugs re: relative addressing of list caches ("index.caches" files) the one of the pre-releases of 3.12 noticed by Christian.
+<li> Changed the code so that the system tmp area is never used, i.e. so that only o..pacman..o/tmp is used for temporary files.  Thanks to Iwona of LBNL for pointing this out.
+<li> Fixed a problem caused if you try to use 3.11 to update an installation created with 3.10.  The symptom is a message telling you to 
+"contact Pacman headquarters."  Thanks to Emil Obreshkov for noticing the problem.
+</ul>
+<li>Pacman-3.11. March 29, 2005.
+<ul>
+<li> Added support for MacOS, SuSE-9, SuSE-9.1, SuSE-9.2, SuSE-9.3.
+<li> Added more -retry options.
+<li> Added -o or -out to specify an output file for snapshots as suggested by Christian Arnault.
+<li> Rewrote untarring to handle tar-overwriting precisely and to increase speed.
+<li> -allow tar-overwrite no longer needed for ATLAS.
+<li> Add official support for Darwin aka MacOS.
+<li> Fixed a bug in requirements selection "| ...".  The effect of the bug was to ignore the requirements
+condition in certain circumstances.
+<li> download('xxx') where 'xxx' is a filename is now assumed to be prefixed with the cache name of the cache
+containing the source code.  This means that if you put tarballs like xxx.tar.gz in the same directory of a
+source cache, you can download them with <b>download('xxx.tar.gz')</b>.  This is convenient for making caches
+which are easily moveable to different file systems.
+<li> Specification of packages directly by source code file name works now independent of the package name.
+<li> downloadUntarzip(...) now doesn't attempt to untar/zip unless the downloaded file has the usual suffixes.
+<li> Improve overwriting tarball removals.
+<li> Fixed a minor type-mismatch which caused writing an error message to fail.
+</ul>
+<li>Pacman-3.10. February 15, 2005.
+<ul>
+<li> The shelve module has been replaced by a different implementation.  This caused nasty OS/Python version
+dependent problems.
+<li> -clear-snapshots now works rather than does nothing, as notice by Alessandro de Salvo.
+<li> Fixed problem where empty directory trees may be left behind after removing ATLAS installations.
+<li> Add -history as well as -last to show the history of Pacman commands and results.
+<li> Setup scripts appropriately regenerated on -update operations.
+<li> Fixed using an installation cache if you don't have write permission.
+<li> Added -retry to control http retries and pauses.
+<li> No longer have to have write priviledges on an installation to use it as a cache.  Error
+messages improved.
+<li> Add an <a href="Basics.html">md5check</a> atom.
+</ul>
+<li>Pacman-3.03. January 31, 2005.  
+<ul>
+<li>Added CERN Scientific Linux and Tao Linux as a supported platforms.
+<li>Added <a href="How_to_lock_a_source_cache_while_you_make_changes.html">lock mechanism for source caches</a>.
+<li> Fixed -remove problem where the default -recursive remove removes dependencies even if they might be dependents of non-removed packages.
+<li>Added <a href="Basics.html">launchWebBrowser() and askUntilFileExists()</a> atoms.
+<li>Added -d description, -d url and -d tar (the last displays tarball contents when used with -d cmp).
+<li> Added -v path and -ask path to control verbosity and permission for path variable assignments.
+<li> Added -v pac and -ask pac to control verbosity and ask permission to install and uninstall packages.
+<li>Improved error messages if uinstall shell commands fail.
+<li>Package environments are now setup before uninstall as this is sometimes needed by uninstall shell commands.
+<li>Improved handling of failing downloads.
+<li>Fixed typos in a tutorial noticed by Marco.
+<li> Added documentation for <a href="Grid.html">workspace</a>.
+<li> Added atoms <a href="version.html">patch and option</a> atoms.  These behave identically to "version", "release" and "tag" but let Pacman
+authors to chose a version string atom that goes along with their own normal terminology.
+<li> Fixed a bug in Path handling causing paths to be mangled during uninstallation.
+<li> Fixed a bug translating old source code which sometimes causes paths to be incorrectly prefixed to environment variable values.
+<li> Fixed a problem where -fetch incorrectly reported that a package was not installable (this did not affect anything in the sense that if
+you tried installing anyway, it would work).
+<li> -extract-download now asks before overwriting an existing download file.
+</ul>
+<li>Pacman-3.02.  January 1, 2005.
+<ul>
+<li> Added returns exit code 0 if the Pacman command succeeds, 1 otherwise.
+<li> Added supported architectures RedHat, Fedora, Cygwin, RHEL, AIX, SuSE and Debian.
+<li> Added "Writing your own Pacman package" tutorial to the standard documentation.
+<li> Set TMP environment variable to full path of local temp area.  Problem pointed out by Nate Mueller.
+<li> The default -remove will now not remove packages which are depended upon by
+other packages in the installation.  This makes -remove the inverse of -get.
+<li> Added "SOURCE" translation (undocumented PM2 feature) for Nate.
+<li> Added some old Pacman 2 style platform names that VDT's current source code
+is referring to.
+<li> Fixed a nice problem that Jerry Gieraltowski ran into having to do with the meaning of <b>download=...</b> in the
+old syntax.  The list of guards and downloads may be tested in any order, but it's clear that the authors of some
+Pacman code intend for it to be tests in a particular order.  The order actually tested turns out to be python version
+dependent (at least) and can cause problems if the guards aren't mutually exclusive.  I settled this by fixing 
+the order of testing to always be the given order.
+<li> Added code suggested by Nate Mueller to make setup.pl perl output as well as sh,csh and py.
+<li> Added many platforms known and supported (see -platforms).  Unknown platforms are now equivalent to '*'.
+<li> Snapshot default file names are now nicer.
+<li> Added <i>restore</i> which lets you save configuration information between uninstalls of a package.  See
+the <a href="Packages.html">packages</a> section of the documentation.
+<li> Return username "unknown" rather than aborting if the UID is unknown.
+<li> Removed $PWD in the initial setup.sh for bourne shell.
+<li> Slight improvement in snapshot filenames.
+<li> Fixed a problem with uninstall shell commands.
+<li> Improved fetching so that dependent packages are fetched even if they are not satisfiable (this is
+convenient for the purposes of snapshotting, extract-downloads and extract-sources).
+</ul>
+<li>Pacman-3.01. November 28, 2004.  FIRST NON-BETA RELEASE.
+<ul>
+<li> Documentation complete.
+<li> Installs VDT, Atlas releases,Grid3, Grid3Dev
+<li> Available as % pacman -get Pacman:Pacman
+</ul>
+</ul>
+<p>
+<hr size=5>
+<p>
+<ul>
+<li> Pacman-3.0024.  November 25, 2004.
+<ul>
+<li> Added advanced updating tutorial II.
+<li> Added automatic package removal when installation directories are removed.
+<li> Added versionTuple for tuple of integer style version numbers.
+</ul>
+<li> Pacman-3.0023.  November 23, 2004.
+<ul>
+<li> Improved how syntax errors are reported.
+<li> Fixed problem with Paths causing old syntax to perform the new extra tests,
+causing VDT to fail to install - pointed out by Jerry Gieraltowski.
+<li> Added <i>gccBinary</i>, <i>gccBinaryLE</i>, ... which let's you require that particular 
+binaries are compiled with particular versions of gcc.
+<li> Added system properties atoms <i>systemWordSize</i>, <i>byteOrder</i>, <i>processor</i>,
+<i>systemVersion</i> and <i>systemRelease</i> atoms.
+</ul>
+<li> Pacman-3.0022.  November 22, 2004.
+<ul>
+<li> Fix a problem with snapshots where if you used a symbolic cache name to get the snapshot it kept having to
+reload it.
+<li> Fixed a problem in free disk space checking.
+<li> Fixed a bug that caused package installations to fail if they don't start in the home directory.
+<li> Added the "Handling multiple versions of the same software" tutorial.
+</ul>
+<li> Pacman-3.0021.  November 22, 2004.
+<ul>
+<li> Remove checking download existence at fetch time.
+<li> Add linux2 platform.
+<li> Add update to AIX detection from Alain and Nate.
+<li> Platform handling and % pacman -platforms output improved.
+<li> Defined an initially supported set of architectures.
+<li> Improved Path clash handling (suggestion by Christian).
+<li> Renamed -dom to -domain.
+<li> Improved error messages for tar-overwrites.
+<li> -ask tar-over
+<li> Some improvements to snapshots.
+<li> Improvements to questions asking and saving with Choice, yes, etc.
+<li> Added advanced updating tutorial.
+<li> Speed up snapshot loading.
+</ul>
+<li> Pacman-3.0019.  November 18, 2004.
+<ul>
+<li> Changed the default Python version installed from 2.3.4 to 2.2.3 (done only if Python 2.2 is not already there).
+</ul>
+<li> Pacman-3.0018.  November 18, 2004.
+<ul>
+<li> Added gsiftp addressing for caches, e.g. gsiftp://atlas.bu.edu/caches/:Python.  This works for
+all types of caches except installation caches, which must be in the local file system.
+<li> Made <i>redhat</i>, <i>fedora</i> and <i>cygwin</i> as the default starting platform families.  To override this 
+do <b>% pacman -allow unsupported-platform</b> once.
+<li> Improved the documentation and small fixes.
+</ul>
+<li> Pacman-3.0017.  November 16, 2004. 
+<ul>
+<li> I had turned off the output for shellDialogue by accident.  I turned it back on.
+<li> Added setenv('FOO') now asks the installer for the value of an environment variable as input and assumes
+the answer as a cookie for future questions.
+<li> Fixed typo in -help noticed by Alain Roy.
+<li> Removed <b>-preference</b> from the documentation since it's no longer used.
+<li> Added the <i>setup</i> atom to the documentation.
+<li> -extract-sources and -extract-downloads now default to "." on an empty cache list.
+<li> Fixed a bug noticed by Nate Mueller.  I had forgotten to translate the "exists" option of
+the old syntax's "nativelyInstalled."  This produced an error in generating an error message about the
+problem resulting in a traceback.
+</ul>
+<li> Pacman-3.0016.  November 15, 2004.
+<ul>
+<li> Added -dom <c1> <c2>... which makes a complete display of the environment of the list of caches.  Normally, you just do <b>%
+pacman -dom</b> in an installation area to see a complete list of downloads, shell commands etc., sorted into types.
+<li> Added the <i>watch</i> atom.  This lets you add files or subdirectories to the Pacman environment to be monitored for
+changes over time.  This is a very nice suggestion from Yannick Patois.
+<li> I believe that I fixed a problem that Jerry Gieraltowsi was having with Pacman 2.9x and VDT.
+<li> VDT appears to install correctly.
+<li> Atlas Releases appear to install correctly.
+<li> Miscellaneous small improvements.
+<li> Minor problems with using installations as caches are fixed.
+</ul>
+<li> Pacman-3.0015.  November 14, 2004.  Miscellaneous improvements.
+<li> Pacman-3.0014.  November 12, 2004
+<ul>
+<li> The web documentation is almost complete (% pacman -info).
+<li> The known problem from 3.0012 is fixed.
+<li> Many small improvements in display and error messages.
+<li> Much testing of the cache hierarchy, updating and snapshots.
+</ul>
+<li> Pacman-3.0013.  November 10, 2004
+<ul>
+<li> The cache hierarchy (which no one has probably yet used) has reached it's final form.  This will be
+really nice!
+<li> -allow bad-paths is on by default till I have a chance to improve the checking on this.
+<li> Added % pacman -extract-sources {cache list} extracts all the source codes from a list of caches.  Typically this is
+handy for getting back all the source code in any installation.
+<li> Added % pacman -extract-downloads {cache list} downloads all the files downloaded in a list of caches.
+<li> I changed the default for remove and uninstall back to recursive.  Use -single to uninstall or remove single packages
+(note that with -single, may have to also uninstall packages depending on package configuration).
+</ul>
+<li> Pacman-3.0012.  November 9, 2004
+<ul>
+<li> Snapshots are available.  See the documentation for examples.
+<li> The documentation has been updated somewhat.  It's still not finished.
+<li> The updating behavior of the cache hierarchy has been improved.
+<li> -preference is now gone. -v, -d, -ask options are now saved as defaults whenever they are used.
+You can still do -clear-preferences to remove all such default options.
+</ul>
+<b>Known problem: -get and -install are blocked when you install packages from an installation cache.  You can use -fetch
+instead until I get a chance to fix this.</b>
+<li> Pacman-3.0011. November 6, 2004
+<ul>
+<li> Changed "=pacman=" to "o..pacman..o" to avoid potential special character problems in external utility programs.
+<li> Fixed a problem with the -v option where the defaults did not disappear if you overrode them with -v {something}.
+<li> Changed the default behavior for uninstall and remove.  The default behavior for -fetch, -install, -get is recursive.  The
+default behavior for -uninstall and -remove is now NOT recursive.  % pacman -remove A, for instance, removes A and the minimal
+addiitonal packages required by configuration dependencies.  To remove or uninstall recursively, use % pacman -r -remove A, etc.
+<li> Minor improvements in the -l, -lc browsing output.
+<li> Fixed a problem with uninstalling when multiple packages depend on the same package.
+</ul> 
+Suggestions made by Yannick Patois and Christian Arnault.
+<li> Pacman-3.0010.  November 2, 2004.  Major release.  See the documentation with -info.
+</ul>
+<hr size=5>
+<ul>
+<li> Pacman-2.9275.  Flatten src tree for zippiness.
+<li> Pacman-2.9274.  Made the initial python installation (if necessary) more
+robust.  Added linux2 for Jim's fedora system.  Changed VDT to point to their new location.
+<li> Pacman-2.9273.  Changed "fermi-linux"->"linux-fermi".
+<li> Pacman-2.9272.  Added fermi-linux and -pretendPlatform.
+<li> Pacman-2.9271.  Adding -v:text for Xin.
+<li> Pacman-2.9270.  Evaluate enviros in the setup('...') command at installation time rather than passing them
+to the setup scripts literally.
+<li> Pacman-2.9268.  Hack to get around condor installation command that's returning an error code.
+<li> Pacman-2.9267.  Fixed problem reading grid-mapfile noticed by Xin Zhao.
+<li> Pacman-2.9266.  Improvements to envIsSet.
+<li> Pacman-2.9265.  Tweaks to insertLine for ATLAS DC2 purposes.
+<li> Pacman-2.9264.  Always use the local installation E/tmp directory for downloads. 
+<li> Pacman-2.9262.  For compatibility purposes, I've removed the requirement that non-temporary environment variables
+keep the value that they are first set to.  I'll introduce a new function that does this for authors who want to
+guarantee that an environment variable remains unchanged.
+<li> Pacman-2.9261.  Prepend ./ to the python building script.
+<li> Pacman-2.9260.  Python now installs it's own Python 2.3.3 if it's needed.  You can start with any
+version of Python >= 1.5.2.  The argument order of softLink is swapped at Marco's request.
+<li> Pacman-2.9258.  Fixed an actual bug related to the new untarzip and Pacman2 compatibility. 
+The symptom was that cd-ing into $PAC_TARBALLROOT was missing (remember PAC_TARBALLROOT is gone
+now, except for Pacman2 compatibility).  Bug noticed by Yannik.
+<li> Pacman-2.9257.  Fixed compatibility issue.
+<li> Pacman-2.9256.  Fixed bug preventing updates with the Copy function (found
+by Marco M.).
+<li> Pacman-2.9255.  Registry entries now are added at compile time, so use of "alreadyInstalled" is typically
+not necessary.  Added "fail" function.  Improved various error messages.
+<li> Pacman-2.9250.  More spiffing.  The untar atom now has an optional argument
+to assign an environment variable to the untarred subdirectory (if the second argument is not '' and the
+tarball does not untar into a single subdirectory, an error results).  untar('xxx.tar.gz','XXX_HOME') is a
+typical use.  XXX_HOME is a temporary environment variable only [you can make it permanent by doing
+setenv('XXX_HOME','$XXX_HOME')].  Downloading is also improved.  There is a new atom downloadUntarzip which
+downloads and untar/zips a tarball as one operation.  The first argument is the same as the existing
+download.  An optional second argument has the same meaning as in the new untar.  For example,
+downloadUntarzip('http://.../xxx.tar.gz','XXX_HOME') downloads and unzips xxx.tar.gz.  Besides brevity, the
+advantage of this is that the tarball does not remain after the operation is finished.  In contrast, if you
+do this in two steps with download and untarzip, the tarball will remain. Both the new untar and
+downloadUntarzip allow tarballs that don't untar into a single top level subdirectory (thanks to Jerry
+Gieraltowski for pointing out this problem).
+<li> Pacman-2.9242.  Fixed benign bug in the compiler.  Minor spiffing.
+<li> Pacman-2.9238.  Fixed wrong URL for BNL-PAS as pointed out by Alden.  Added -v:browser to show browser
+launching attempt information.  Fixed running processes testing as pointed out by Patrick.  
+Tracked down and squished a bug that affected ATLAS 7.5.0.  The bug was benign in the sense
+that it would not find a .pacman file rather than making an incorrect installation. Many minor spiffings.
+<li> Pacman-2.9227.  Paths are now checked for consistency and clashes between packages. 
+Untarring is sped up.  Minor spiffing in various places.  VDT 1.1.13 installs
+correctly.  iVDGL:Grid3dev installs correctly.
+<li> Pacman-2.9219.  Documentation update only.
+<li> Pacman-2.9218.  Fixed bug in Paths noticed by Patrick McGuigan.  The symptom was
+that paths defined got expressed in the setup scripts independent of whether
+they were satisifed in the language expression.
+<li> Pacman-2.9217.  Improved ^C handling.  Added Pippy output after talking
+with Pat McGuigan of UTA. The problem with snapshots noticed by Alessandro de
+Salvo has been fixed.
+<li> Pacman-2.9210.  Added circular dependency checking.  This caused a problem with ATLAS:7.7.0 where
+a circular dependency snuck in.  Fixed BNL-PAS default symbolic name for Wensheng Deng. 
+Fixed a problem with snapshots noticed by Alessandro De Salvo.  Added tutorials I-IV to the
+documentation pages.
+<li> Pacman-2.9079.  Fixed a problem noticed by Jakub Moscicki.  Tarballs
+containing dangling symbolic links caused Pacman to claim that the tarball
+wasn't untarred correctly.  Test for correct Python version activated again.
+</ul>
+<p>
+<hr size=5>
+<h3><a href="http://physics.bu.edu/pacman/" target="_blank">Pacman Headquarters</a></h3>
+<p>
+</body>

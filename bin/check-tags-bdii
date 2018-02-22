@@ -1,0 +1,28 @@
+#!/bin/sh
+
+search () {
+  ldapsearch -x -h $1 -p 2170 -b "o=grid" "(|(&(objectclass=gluece)(glueceaccesscontrolbaserule=*atlas*)(gluecepolicymaxcputime>=30))(&(objectClass=glueclustertop)(gluehostapplicationsoftwareruntimeenvironment=*atlas*)))" glueceinfototalcpus gluesubclustername glueceinfohostname gluehostapplicationsoftwareruntimeenvironment
+}
+
+source $CONFPATH/install.conf
+
+if [ "$1" = "" ] ; then
+  while read line ; do
+    CEFQDN=`echo $line | cut -d: -f 1`
+    TAG=`search $CEFQDN`
+    if [ "$TAG" != "" ] ; then
+      for item in $TAG; do
+        printf "%-25s : %s\n" $CEFQDN $item
+      done
+    fi
+  done < $HOSTLIST
+else
+  TAG=`search $1`
+  if [ "$TAG" != "" ] ; then
+    for item in $TAG; do
+      printf "%-30s : %s\n" $1 $item
+    done
+  fi
+fi
+
+exit

@@ -1,0 +1,24 @@
+#!/bin/sh
+show-pending job.name,job.id,jdl.name,job.status | \
+       grep -i Waiting | awk '{print $2" "$4" "$6}' | \
+       while read line; do
+             JOBNAME="`echo $line | awk '{print $1}'`"
+             JOBID="`echo $line | awk '{print $2}'`"
+             JDLNAME="`echo $line | awk '{print $3}'`"
+             REQID="`ljsfbkk.py --select="job.requestfk" --quiet --jobid="$JOBID"`"
+
+             echo "Purging job $JOBNAME"
+             cancel-job -y $JOBSPATH/$JOBNAME
+
+             # Set the validation of this job to failed
+             set-validation $JOBNAME failed
+
+             # Remove the job file
+             rm -f $JOBSPATH/$JOBNAME
+
+             # Remove the job lock for this JDL
+             ljsfinfo.py --remove-lock --jdlname=$JDLNAME
+
+             # Set the request to ignore to allow resubmission
+             ljsfinfo.py --set-reqstatus=autorun --reqid=$REQID
+done

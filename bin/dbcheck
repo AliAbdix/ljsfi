@@ -1,0 +1,8 @@
+#!/bin/sh
+[ ! -s $CONFPATH/.my.cnf ] && echo "Configuration file $CONFPATH/.my.cnf not found"
+mysqladmin --defaults-file=$CONFPATH/.my.cnf status >& /dev/null
+retcode=$?
+if [ $retcode != 0 ] ; then
+  echo "The DB server is down or unreachable. Please try again later."
+fi
+exit $retcode

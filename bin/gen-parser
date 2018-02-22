@@ -1,0 +1,12 @@
+#!/bin/sh
+RELEASE="$1"
+SITE="$2"
+TMPPARSER=/tmp/gen-parser.$$
+ljsfreq.py --queryrel --rel=$RELEASE --sel=/atlas_install/protected/showrel_new.php | awk -F',' '{for(i=1;i<=NF;i++) print $i;}' | awk -F '=' '{print "s#@"$1"@#"$2"#g"}' > $TMPPARSER
+[ "$SITE" != "" -a -s $TMPPARSER ] && ljsfreq.py --querysite --cs=${SITE} | awk -F',' '{for(i=1;i<=NF;i++) print $i;}' | awk -F '=' '{print "s#@"$1"@#"$2"#g"}' >> $TMPPARSER
+echo "s#@VO@#$VO#g" >> $TMPPARSER
+echo "s#@LFC_HOST@#$LFC_HOST#g" >> $TMPPARSER
+echo "s#@LCG_CATALOG_TYPE@#$LCG_CATALOG_TYPE#g" >> $TMPPARSER
+cat $TMPPARSER
+rm -f $TMPPARSER
+exit

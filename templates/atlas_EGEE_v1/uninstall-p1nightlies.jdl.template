@@ -1,0 +1,9 @@
+Executable = "sw-mgr";
+InputSandbox = {"SCRIPTPATH/sw-mgr","SCRIPTPATH/lcg-tags"};
+OutputSandbox = {"stdout", "stderr", "install.xml"};
+stdoutput = "stdout";
+stderror = "stderr";
+Arguments = "-r RELNAME -l LOGPATH/RELNAME -p PHYSPATH/VERSIONAREA -o -n -P SWNAME -T RELCATEGORY -t ARCH -O opt --require-prj REQPRJ -m PACMANVERSION --grid-name GRIDNAME --xml install.xml EXTRAPKG";
+Environment = {"LCG_CATALOG_TYPE=LCGCATALOGTYPE","LFC_HOST=LFCHOST"};
+VirtualOrganisation = "atlas";
+Requirements = other.GlueCEUniqueId=="CEID";

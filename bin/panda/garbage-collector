@@ -1,0 +1,607 @@
+#!/bin/sh
+##########################################################
+#          ATLAS GarbageCollector LJSFi module           #
+# Alessandro De Salvo <Alessandro.DeSalvo@roma1.infn.it> #
+##########################################################
+
+help()
+{
+  echo "HELP"
+  echo "`basename $0`: perform garbage collection of jobs"
+  echo "Usage: `basename $0` [OPTIONS]"
+  echo "       OPTIONS:"
+  echo "            -a|--all                Restart all requests,"
+  echo "                                    Don't check for available resources."
+  echo "            --cancel-only           Cancel the jobs without removing the job file."
+  echo "            -c|--cleanup-rel <rel>  Cleanup obsolete release <rel>."
+  echo "            -C|--check-site-info    Check and fix site info."
+  echo "               --ce <cename>        Filter on the CE name"
+  echo "            -d|--debug              Output debug messages."
+  echo "            -e|--exclude <file>     Exclude sites from <file>"
+  echo "                                    (default: $EXCLUDELIST)."
+  echo "            -g|--grid-name <name>   Select grid name or ALL (default: $GRIDNAME)."
+  echo "            -h|--help               Display this help."
+  echo "            -i|--interval           Time interval, in seconds"
+  echo "                                    (default: $INTERVAL s)."
+  echo "            -I|--ignore-tags        Ignore tags in task restarts"
+  echo "            -m|--max-failures <n>   max number of failures allowed for job restart,"
+  echo "                                    0 for no limits (default: $MAXFAILURES)"
+  echo "            -N|--no-cleanup-failed  don't cleanup failed requests,"
+  echo "            -n|--no-cleanup-stale   don't cleanup stale requests,"
+  echo "            -r|--restart <rel>      Restart installations of release <rel>"
+  echo "            -R|--request-status <s> Restart installations with status <s>"
+  echo "            -s|--dsstatus <0|1>     Default site status:"
+  echo "                                    0=disabled, 1=enabled (default: $DSSTATUS)."
+  echo "            -S|--status             Filter on the job status"
+  echo "            -t|--trial              Perform a trial run, no actions."
+  echo "            -v|--verbose            Verbose output."
+  exit 0
+}
+
+# Get the autorequest configuration
+[ -s "${CONFPATH}/autorequest.conf" ] && source ${CONFPATH}/autorequest.conf
+
+# Get the command line options
+EXCLUDELIST="${CONFPATH}/autorequest.exclude"
+NOW="`date +%s`"
+# Default INTERVAL is 7 days
+INTERVAL=$((86400*7))
+TRIAL="no"
+MAXFAILURES=0
+REQSTATUS="stopped"
+CLEANUPSTALE="y"
+CLEANUPFAILED="y"
+MONSTEP=500
+[ -z "$GRIDNAME" ] && GRIDNAME="ALL"
+[ -z "$DSSTATUS" ] && DSSTATUS="1"
+OPTS=`getopt -o ac:Cde:g:hIi:m:noNr:R:s:S:tv -l all,cancel-only,ce:,check-site-info,cleanup-orphaned,cleanup-rel:,debug,dsstatus:,exclude:,grid-name:,help,ignore-tags,interval:,max-failures:,no-cleanup-failed,no-cleanup-stale,request-status:,restart:,status:,trial,verbose -- "$@"`
+if [ $? != 0 ] ; then echo "Terminating..."; exit -1 ; fi
+eval set -- "$OPTS"
+while true ; do
+        case "$1" in
+                -h|--help)              help; shift;;
+                -a|--all)               ALLREQ="yes"; shift;;
+                --cancel-only)          CANCELONLY="yes"; shift;;
+                -c|--cleanup-rel)       CLEANUPREL="$2"; shift 2;;
+                -C|--check-site-info)   CHECKSITE="yes"; shift;;
+                --ce)                   CEREQ="--cename=$2"; shift 2;;
+                -d|--debug)             DEBUG="yes"; shift;;
+                -e|--exclude)           EXCLUDELIST="$2"; shift 2;;
+                -g|--grid-name)         GRIDNAME="$2"; shift 2;;
+                -i|--interval)          INTERVAL="$2"; shift 2;;
+                -I|--ignore-tags)       IGNORETAGS="yes"; shift;;
+                -m|--max-failures)      MAXFAILURES="$2"; shift 2;;
+                -o|--cleanup-orphaned)  CLEANUPORPHANED="y"; shift;;
+                -N|--no-cleanup-failed) unset CLEANUPFAILED; shift;;
+                -n|--no-cleanup-stale)  unset CLEANUPSTALE; shift;;
+                -r|--restart)           RESTARTREL="$2"; shift 2;;
+                -R|--request-status)    REQSTATUS="$2"; shift 2;;
+                -s|--dsstatus)          DSSTATUS="$2"; shift 2;;
+                -s|--status)            FILTER="`echo $2 | tr a-z A-Z`"; shift 2;;
+                -t|--trial)             TRIAL="yes"; shift;;
+                -v|--verbose)           VERBOSE="yes"; shift;;
+                --)                     shift ; break ;;
+                \?)                     break ;
+                exit ;;
+        esac
+done
+MAXAGE=$(($NOW-$INTERVAL))
+[ -z "$GRIDNAME" ] && GRIDNAME="ALL"
+
+
+# Check the DB status
+$BINPATH/dbcheck
+rc=$?
+[ $rc -ne 0 ] && exit $rc
+
+# Check the proxy status
+$BINPATH/check-proxy
+[ $rc -ne 0 ] && exit $rc
+
+# Create the final exclude list
+EXCLLST=/tmp/ljsf.gc.exclude.list.tmp.$$
+[ -s $EXCLUDELIST ] && cp $EXCLUDELIST $EXCLLST
+#ljsfinfo.py --list-resource --site-disabled --grid-name=$GRIDNAME --quiet --cache --cache-timeout 3600 >> $EXCLLST
+ljsf get site list disabled grid=$GRIDNAME >> $EXCLLST
+if [ "$DEBUG" == "yes" ] ; then
+    echo "==================="
+    echo "Using exclude list:"
+    echo "==================="
+    cat $EXCLLST
+    echo "==================="     
+fi
+
+TMPCELIST="/tmp/ljsfi.gc.celist.$$.tmp"
+if [ "$ALLREQ" != "yes" ] ; then
+    [ -n "$VERBOSE" -o -n "$DEBUG" ] && echo "Getting the list of the resources using ljsf-infosys"
+    ljsf-infosys --list-resource --flavor $GRIDNAME --cache --cache-timeout 3600  | sort | uniq > ${TMPCELIST}
+    [ -n "$VERBOSE" -o -n "$DEBUG" ] && echo "`cat $TMPCELIST | wc -l` resources available"
+fi
+
+# Temp files for site info and tags
+TMPSITEINFO="/tmp/siteinfo.$$"
+TMPTAGINFO="/tmp/taginfo.$$"
+TMPRELINFO="/tmp/relinfo.$$"
+
+# Get the release definitions
+[ -n "$VERBOSE" ] && echo "Getting the release definitions"
+ljsfinfo.py --queryrel=% --cache --cache-timeout 3600 > $TMPRELINFO
+
+# Reset fake autorun requests
+TMPAUTORUNLIST="/tmp/autorun.list.$$"
+[ -n "$VERBOSE" ] && echo -n "Checking fake autorun requests. IDs to check: "
+#ljsfreq.py --query --status=autorun | awk -F, '{print $1}' | sort | uniq > $TMPAUTORUNLIST
+ljsf get request list status=autorun | awk -F, '{print $1}' | sort | uniq > $TMPAUTORUNLIST
+NUMREQS="`cat $TMPAUTORUNLIST | wc -l`"
+[ -n "$VERBOSE" ] && echo "$NUMREQS"
+REQINDX=0
+ljsfbkk.py --select=requestfk --validation=pending --quiet | while read REQID; do
+    grep -q $REQID $TMPAUTORUNLIST
+    if [ $? -eq 0 ] ; then
+        [ -n "$VERBOSE" ] && echo "Setting $REQID to accepted"
+        ljsfreq.py --update --reqid="$REQID" --status=accepted
+    fi
+    [ $((REQINDX % MONSTEP)) == 0 -a -n "$VERBOSE" ] && echo ">> ${REQINDX}/${NUMREQS} done"
+    REQINDX=$((REQINDX+1))
+done
+rm -f $TMPAUTORUNLIST
+
+# Remove stale locks
+[ -n "$VERBOSE" ] && echo "Removing stale locks"
+#ljsfinfo.py --show-fake-locks | while read JDLNAME; do
+ljsf get job stale-lock age=300 | while read JDLNAME; do
+    [ -n "$VERBOSE" ] && echo $JDLNAME
+    #ljsfinfo.py --remove-lock --jdlname=$JDLNAME &> /dev/null
+    ljsf del job lock jdlname=$JDLNAME
+done
+
+# Fix wrong requests
+[ -n "$VERBOSE" ] && echo "Fixing wrong requests"
+ljsfinfo.py --fix-wrong-requests
+
+# Fix wrong accepted jobs
+[ -n "$VERBOSE" ] && echo "Fixing wrong accepted jobs"
+ljsf get request list status=accepted activejobs=0 jobs=0 age=3600 | cut -d, -f 1 | sort | uniq | while read REQID; do
+   [ -n "$VERBOSE" ] && echo "Fixing request id $REQID"
+   ljsfreq.py --update --reqid="$REQID" --status=autorun &> /dev/null
+done
+
+[ ! -f ${EXCLLST} ] && touch ${EXCLLST}
+if [ -n "$CLEANUPFAILED" ] ; then
+   # Search for accepted and unfinished requests older than MAXAGE
+   [ "$VERBOSE" == "yes" -o "$DEBUG" == "yes" ] && echo "Searching for requests in accepted status [GRID: $GRIDNAME]"
+   TMPREQLIST="/tmp/ljsfi.gc.rl.$$.tmp"
+   for GN in `echo $GRIDNAME | sed 's/,/ /g'`; do
+       ljsfreq.py --query --status=accepted --grid-name=$GN --age=$MAXAGE | cut -d ',' -f 1,4,6 | grep -v -f ${EXCLLST} > $TMPREQLIST
+       TOTREQS="`cat $TMPREQLIST | wc -l`"
+       [ "$VERBOSE" == "yes" -o "$DEBUG" == "yes" ] && echo "Number of requests found: $TOTREQS"
+
+       # Clean up stale requests
+       if [ -n "$CLEANUPSTALE" ] ; then
+           cat $TMPREQLIST | while read i; do
+               [ "$COUNT" == "" ] && let COUNT=0
+               let COUNT=$COUNT+1
+               [ "$VERBOSE" == "yes" -o "$DEBUG" == "yes" ] && echo "[${COUNT}/${TOTREQS}] ($(((100*COUNT)/TOTREQS))% done - $GN)"
+               JOBREQ="`echo $i | cut -d',' -f 1`"
+               RELNAME="`echo $i | cut -d',' -f 2`"
+               JOBRES="`echo $i | cut -d',' -f 3`"
+               JOBSTAT="`ljsfbkk.py --select=job.id,job.name,jdl.name,job.retrieval_time --quiet --request=$JOBREQ --grid-name=$GN --last=1`"
+               JOBID="`echo $JOBSTAT | cut -d, -f 1`"
+               JOBNAME="`echo $JOBSTAT | cut -d, -f 2 | sed 's/^ *//'`"
+               JDLNAME="`echo $JOBSTAT | cut -d, -f 3 | sed 's/^ *//'`"
+               RETTIME="`echo $JOBSTAT | cut -d, -f 4 | sed 's/^ *//' | tr a-z A-Z`"
+               if [ "$DEBUG" == "yes" ] ; then
+                   echo "JOBSTAT=$JOBSTAT"
+                   echo "JOBID=$JOBID"
+                   echo "JOBNAME=$JOBNAME"
+                   echo "JDLNAME=$JDLNAME"
+                   echo "RETTIME=$RETTIME"
+               fi
+               if [ -f "$JOBSPATH/$JOBNAME" ] ; then
+                   # Cancel the job, if possible, using the jobfile
+                   if [ "$TRIAL" == "yes" ] ; then
+                       echo cancel-job -y $JOBSPATH/$JOBNAME
+                       [ -z "$CANCELONLY" ] && echo rm -f $JOBSPATH/$JOBNAME
+                   else
+                       cancel-job -y $JOBSPATH/$JOBNAME
+                       [ -z "$CANCELONLY" ] && rm -f $JOBSPATH/$JOBNAME
+                   fi
+               else
+                   # Cancel the job, if possible, using the jobid
+                   if [ "$TRIAL" == "yes" ] ; then
+                       [ -n "$JOBID" ] && echo cancel-job -y -i $JOBID
+                   else
+                       [ -n "$JOBID" ] && cancel-job -y -i $JOBID
+                   fi
+               fi
+               JOBVAL="failed"
+               if [ "$RETTIME" == "" -o "$RETTIME" == "NONE" ] ; then
+                   # Set the release status, in case the job output has not been retrieved
+                   if [ "$TRIAL" == "yes" ] ; then
+                       [ -n "$JOBID" ] && echo ljsfbkk.py --insert --jobid="$JOBID" --validation="$JOBVAL" --jobcomments="GarbageCollector: $JOBVAL"
+                   else
+                       [ -n "$JOBID" ] && ljsfbkk.py --insert --jobid="$JOBID" --validation="$JOBVAL" --jobcomments="GarbageCollector: $JOBVAL"
+                   fi
+               else
+                   # Set the release status, in case the job output has been already fully retrieved
+                   if [ -n "$JOBID" ] ; then
+                       JOBEC="`ljsfbkk.py --select=job.exit_code --jobid="$JOBID" --quiet | tr a-z A-Z`"
+                       if [ "$JOBEC" != "NONE" ] ; then
+                           [ $JOBEC -eq 0 ] && JOBVAL="ok"
+                       fi
+                       if [ "$TRIAL" == "yes" ] ; then
+                           echo ljsfbkk.py --insert --jobid="$JOBID" --validation="$JOBVAL" --jobcomments="GarbageCollector: $JOBVAL"
+                       else
+                           ljsfbkk.py --insert --jobid="$JOBID" --validation="$JOBVAL" --jobcomments="GarbageCollector: $JOBVAL"
+                       fi
+                   fi
+               fi
+               [ "$JOBVAL" == "ok" ] && REQSTAT="done" || REQSTAT="ignore"
+               [ "$JOBVAL" == "ok" ] && RELSTAT="installed" || RELSTAT="cancelled"
+               # Set the request status
+               if [ "$TRIAL" == "yes" ] ; then
+                   [ -n "$JOBRES" -a -n "$RELNAME" ] && echo ljsfinfo.py --cs="$JOBRES" --rel="$RELNAME" --status="$RELSTAT"
+                   [ -n "$JDLNAME" ] && echo ljsfinfo.py --remove-lock --jdlname="$JDLNAME"
+                   [ -n "$JOBREQ" ] && echo ljsfreq.py --update --reqid="$JOBREQ" --status="$REQSTAT" --comments="GarbageCollector: $REQSTAT"
+               else
+                   [ -n "$JOBRES" -a -n "$RELNAME" ] && ljsfinfo.py --cs="$JOBRES" --rel="$RELNAME" --status="$RELSTAT"
+                   [ -n "$JDLNAME" ] && ljsfinfo.py --remove-lock --jdlname="$JDLNAME"
+                   [ -n "$JOBREQ" ] && ljsfreq.py --update --reqid="$JOBREQ" --status="$REQSTAT" --comments="Garbage Collector: $REQSTAT"
+               fi
+           done
+       fi
+
+       if [ -n "$CLEANUPORPHANED" ] ; then
+           # Search for orphaned installations, older than MAXAGE
+           [ "$VERBOSE" == "yes" -o "$DEBUG" == "yes" ] && echo "Searching for orphaned installations"
+           TMPINSTLIST="/tmp/ljsfi.gc.il.$$.tmp"
+           BEFORE="`echo $MAXAGE | awk '{print strftime("%Y-%m-%d %H:%M:%S",$1)}'`"
+           ljsfinfo.py --select=site.cs,release_stat.name --before="$BEFORE" --status=\!installed,\!failed,\!removed,\!pending,\!aborted --rel=\!ALL --grid-name=$GN --quiet | sed 's/"//g' > $TMPINSTLIST
+           TOTINST="`cat $TMPINSTLIST | wc -l`"
+           [ "$VERBOSE" == "yes" -o "$DEBUG" == "yes" ] && echo "Number of orphaned installations found: $TOTINST"
+           cat $TMPINSTLIST | while read data; do
+               JOBRES="`echo $data | cut -d, -f 1`"
+               RELNAME="`echo $data | cut -d, -f 2`"
+               LASTJOB="`ljsfbkk.py --select="job.exit_code,job.id,job.name,jdl.name,job.requestfk,validation.description" --last=1 --cs="$JOBRES" --rel="$RELNAME" --quiet`"
+               JOBEXIT="`echo $LASTJOB | cut -d, -f 1`"
+               JOBID="`echo $LASTJOB | cut -d, -f 2 | sed 's/^ *//'`"
+               JOBNAME="`echo $LASTJOB | cut -d, -f 3 | sed 's/^ *//'`"
+               JDLNAME="`echo $LASTJOB | cut -d, -f 4 | sed 's/^ *//'`"
+               JOBREQ="`echo $LASTJOB | cut -d, -f 5 | sed 's/^ *//'`"
+               JOBVAL="`echo $LASTJOB | cut -d, -f 6 | sed 's/^ *//'`"
+               [ -n "$DEBUG" ] && echo "Checking release $RELNAME in $JOBRES - last job id: $JOBID"
+               if [ "$JOBEXIT" == "0" ] ; then
+                   TARGET_STATUS="`ljsfbkk.py --quiet --select="(select t.target from job j, jdl jd, task t where j.jdlfk=jd.ref and jd.type=t.name and j.id=job.id)" --jobid="$JOBID" 2>/dev/null`"
+                   if [ -z "$TARGET_STATUS" -o "$TARGET_STATUS" == "None" ] ; then
+                       TARGET_STATUS="inconsistent"
+                       echo "No target status for job id [${JOBID}], forcing status [${TARGET_STATUS}]"
+                   fi
+                   [ -n "$DEBUG" -o "$VERBOSE" ] && echo "Last job exit code: $JOBEXIT [SUCCESS] - setting release $RELNAME as $TARGET_STATUS in $JOBRES"
+                   JOBSTAT=$TARGET_STATUS
+               else
+                   [ -n "$DEBUG" -o "$VERBOSE" ] && echo "Last job exit code: $JOBEXIT [FAILED] - setting release $RELNAME as failed in $JOBRES"
+                   JOBSTAT="failed"
+               fi
+               if [ "$JOBVAL" == "pending" -a -n "$JOBID" ] ; then
+                   if [ "$JOBSTAT" == "failed" ] ; then
+                       [ -n "$DEBUG" -o "$VERBOSE" ] && echo "Setting job id [${JOBID}] as failed"
+                       ljsfbkk.py --insert --jobid="${JOBID}" --validation=failed
+                       agis-tags --remove --rel=$RELNAME --panda-resource=$JOBRES
+                   else
+                       [ -n "$DEBUG" -o "$VERBOSE" ] && echo "Setting job id [${JOBID}] as ok"
+                       ljsfbkk.py --insert --jobid="${JOBID}" --validation=ok
+                       agis-tags --add --rel=$RELNAME --panda-resource=$JOBRES
+                   fi
+               fi
+               ljsfinfo.py --cs=$JOBRES --rel=$RELNAME --status=$JOBSTAT
+               if [ -n "$JDLNAME" ] ; then
+                   [ -n "$DEBUG" ] && echo "Removing lock from $JDLNAME"
+                   ljsfinfo.py --remove-lock --jdlname="$JDLNAME"
+               fi
+               if [ -n "$JOBREQ" -a "$JOBREQ" != "0" ] ; then
+                   [ -n "$DEBUG" ] && echo "Setting request ID $JOBREQ to [ignore]"
+                   ljsfreq.py --update --reqid=$JOBREQ --status=ignore
+               fi
+           done
+           rm -f $TMPINSTLIST
+       fi
+
+       # Cleanup obsolete releases
+       if [ -n "$CLEANUPREL" ] ; then
+           TMPRLOBS=/tmp/rellist.gc.obsolete.$$
+           TMPRLALL=/tmp/rellist.gc.all.$$
+
+           ljsfinfo.py --queryrel=$CLEANUPREL --autoinstall --obsolete | sort > $TMPRLOBS
+           ljsfinfo.py --queryrel=% | sort > $TMPRLALL
+
+           cat $TMPRLOBS | while read l; do
+               RELVER="`echo $l | sed 's/.*\"RELEASE=\([^\"]*\)\".*/\1/'`"
+               RELAREA="`echo $l | sed 's/.*\"VERSIONAREA=\([^\"]*\)\".*/\1/'`"
+               RELREQ="`echo $l | sed 's/.*\"REQUIRES=\([^\"]*\)\".*/\1/'`"
+               PARENTAREA="`cat $TMPRLALL | grep \\\"RELEASE=$RELREQ\\\" | sed 's/.*\"VERSIONAREA=\([^\"]*\)\".*/\1/'`"
+               RELTYPE="patch"
+               [ "$RELREQ" == "None" ] && RELTYPE="base"
+               [ "$RELAREA" != "$PARENTAREA" ] && RELTYPE="base"
+               [ "$RELTYPE" == "base" ] && REQTYPE="cleanup" || REQTYPE="remove-tag"
+               if [ "$VERBOSE" == "yes" -o "$DEBUG" == "yes" ] ; then
+                   echo "Checking $RELVER"
+                   echo "Release parameters:"
+                   echo "    RELAREA=$RELAREA"
+                   echo "    RELREQ=$RELREQ"
+                   echo "    PARENTAREA=$PARENTAREA"
+                   echo "    RELTYPE=$RELTYPE"
+               fi
+               if [ "$TRIAL" == "no" ] ; then
+                   TMPFAILED=/tmp/failed.gc.$$
+                   #ljsfinfo.py --select=site.cs --rel=$RELVER --status=failed --grid-name=$GN --quiet | grep -v -f ${EXCLLST} | sed 's/"//g' > $TMPFAILED
+                   #ljsfinfo.py --select=site.cs --rel=$RELVER --status=maxinstretry --grid-name=$GN --quiet | grep -v -f ${EXCLLST} | sed 's/"//g' >> $TMPFAILED
+                   ljsf get release dstat rel=$RELVER status=failed grid=$GN quote | cut -d, -f 3 | grep -v -f ${EXCLLST} | sed 's/"//g' > $TMPFAILED
+                   ljsf get release dstat rel=$RELVER status=maxinstretry grid=$GN quote | cut -d, -f 3 | grep -v -f ${EXCLLST} | sed 's/"//g' >> $TMPFAILED
+                   cat $TMPFAILED | while read cs; do
+                       grep $cs $TMPCELIST &>/dev/null
+                       if [ $? -eq 0 ] ; then
+                           TMPRESINFO=${TMPSITEINFO}.`echo $cs | sed 's#[-:/.]#_#g'`
+                           #[ ! -s "$TMPRESINFO" ] && ljsf-infosys --info --panda-resource $cs --cache --cache-timeout 7200 2> /dev/null > $TMPRESINFO
+                           [ ! -s "$TMPRESINFO" ] && ljsf get resource info name=$cs 2> /dev/null > $TMPRESINFO
+                           ATLAS_SITENAME="`cat $TMPRESINFO | grep '^ATLAS_SITENAME=' | tail -n 1 | cut -d= -f 2-`"
+                           SITENAME="`cat $TMPRESINFO | grep '^SITENAME=' | tail -n 1 | cut -d= -f 2-`"
+                           GNAME="`cat $TMPRESINFO | grep '^GRID=' |tail -n 1 | cut -d= -f 2-`"
+                           CENAME=$cs
+                           if [ -n "$SITENAME" ] ; then
+                               [ -z "$ATLAS_SITENAME" ] && ATLAS_SITENAME=$SITENAME
+                               REQID="`ljsfreq.py --query --cs=$cs --rel=$RELVER --reqtype=$REQTYPE | tail -n 1 | cut -d, -f 1`"
+                               if [ -n "$REQID" ] ; then
+                                   if [ $MAXFAILURES -gt 0 ] ; then
+                                       FAILURES="`ljsfbkk.py --select=job.exit_code --dest=$CENAME --last=$((MAXFAILURES+1)) --quiet --rel=$RELVER | grep -v ^0 | wc -l`"
+                                   else
+                                       FAILURES=-1
+                                   fi
+                                   if [ $FAILURES -gt $MAXFAILURES ] ; then
+                                       echo "Too many failures ($FAILURES) for release $RELVER in $CENAME"
+                                       ljsfinfo.py --status=maxrmretry --rel=$RELVER --cs=$cs
+                                   else
+                                       [ "$DEBUG" != "" -a $FAILURES -ge 0 ] && echo "Number of failures for release $RELVER in $CENAME: $FAILURES [OK]"
+                                       [ "$VERBOSE" == "yes" -o "$DEBUG" == "yes" ] && echo "Restarting task $REQTYPE in $cs [$GNAME]"
+                                       ljsfreq.py --update --reqid=$REQID --status=autorun
+                                   fi
+                               else
+                                   [ "$VERBOSE" == "yes" -o "$DEBUG" == "yes" ] && echo "Requesting task $REQTYPE in $cs [$GNAME]"
+                                   ljsfreq.py --cs=$cs --rel=$RELVER --reqtype=$REQTYPE --atlas-sitename=$ATLAS_SITENAME --sitename=$SITENAME --status=autorun --grid-name=$GNAME --default-site-status=$DSSTATUS
+                               fi
+                           else
+                               [ "$VERBOSE" == "yes" -o "$DEBUG" == "yes" ] && echo "Cannot get the site name for $cs"
+                           fi
+                       else
+                           [ "$VERBOSE" == "yes" -o "$DEBUG" == "yes" ] && echo "Cannot manage $RELVER on $cs : resource not found"
+                       fi
+                   done
+                   rm -f $TMPFAILED
+
+                   # Inconsistent records
+                   ljsfinfo.py --select=site.cs --rel=$RELVER --status=inconsistent --grid-name=$GN --quiet | grep -v -f ${EXCLLST} | sed 's/"//g' | while read cs; do
+                       grep $cs $TMPCELIST &>/dev/null
+                       if [ $? -eq 0 ] ; then
+                           TMPRESINFO=${TMPSITEINFO}.`echo $cs | sed 's#[-:/.]#_#g'`
+                           #[ ! -s "$TMPRESINFO" ] && ljsf-infosys --info --panda-resource $cs --cache --cache-timeout 7200 2> /dev/null > $TMPRESINFO
+                           [ ! -s "$TMPRESINFO" ] && ljsf get resource info name=$cs 2> /dev/null > $TMPRESINFO
+                           ATLAS_SITENAME="`cat $TMPRESINFO | grep '^ATLAS_SITENAME=' | tail -n 1 | cut -d= -f 2-`"
+                           SITENAME="`cat $TMPRESINFO | grep '^SITENAME=' | tail -n 1 | cut -d= -f 2-`"
+                           GNAME="`cat $TMPRESINFO | grep '^GRID=' |tail -n 1 | cut -d= -f 2-`"
+                           if [ -n "$SITENAME" ] ; then
+                               [ -z "$ATLAS_SITENAME" ] && ATLAS_SITENAME=$SITENAME
+                               ljsfreq.py --cs=$cs --rel=$RELVER --reqtype=removal --atlas-sitename=$ATLAS_SITENAME --sitename=$SITENAME --status=autorun --grid-name=$GNAME --default-site-status=$DSSTATUS
+                           else
+                               echo "Cannot find any sitename for $cs"
+                           fi
+                       fi
+                   done
+
+                   # Installed records
+                   ljsfinfo.py --select=site.cs --rel=$RELVER --status=installed --grid-name=$GN --quiet | grep -v -f ${EXCLLST} | sed 's/"//g' | while read cs; do
+                       grep $cs $TMPCELIST &>/dev/null
+                       if [ $? -eq 0 ] ; then
+                           REQDATA="`ljsfreq.py --query --cs=$cs --rel=$RELVER --reqtype=removal | tail -n 1 | cut -d, -f 1,8`"
+                           if [ -n "$REQDATA" ] ; then
+                               REQSTAT="`echo $REQDATA | cut -d, -f 2 | tr A-Z a-z`"
+                               if [ "$REQSTAT" != "ignore" ] ; then
+                                   REQID="`echo $REQDATA | cut -d, -f 1`"
+                                   [ -n "$DEBUG" -o -n "$VERBOSE" ] && echo "Setting request id $REQID to status 'ignore'"
+                                   ljsfreq.py --update --reqid=$REQID --status=ignore
+                               fi
+                           fi
+                           REQDATA="`ljsfreq.py --query --cs=$cs --rel=$RELVER --reqtype=cleanup | tail -n 1 | cut -d, -f 1,8`"
+                           if [ -n "$REQDATA" ] ; then
+                               REQSTAT="`echo $REQDATA | cut -d, -f 2 | tr A-Z a-z`"
+                               if [ "$REQSTAT" != "ignore" ] ; then
+                                   REQID="`echo $REQDATA | cut -d, -f 1`"
+                                   [ -n "$DEBUG" -o -n "$VERBOSE" ] && echo "Setting request id $REQID to status 'ignore'"
+                                   ljsfreq.py --update --reqid=$REQID --status=ignore
+                               fi
+                           fi
+                           RELTAG="`ljsfinfo.py --rel=$RELVER --show-reltag --cache --cache-timeout 7200 2>&1`"
+                           TMPRESTAG=${TMPTAGINFO}.`echo $cs | sed 's#[-:/.]#_#g'`
+                           [ ! -s "$TMPRESTAG" -a "$IGNORETAGS" != "yes" ] && show-tags -a $cs 2> /dev/null > $TMPRESTAG
+                           [ ! -s "$TMPRESTAG" ] && touch $TMPRESTAG
+                           if [ "`grep $RELTAG $TMPRESTAG | tail -n 1`" == "" ] ; then
+                               [ -n "$DEBUG" -o -n "$VERBOSE" ] && echo "Release not tagged on $cs"
+                               TMPRESINFO=${TMPSITEINFO}.`echo $cs | sed 's#[-:/.]#_#g'`
+                               [ ! -s "$TMPRESINFO" ] && ljsf-infosys --info --panda-resource $cs --cache --cache-timeout 7200 2> /dev/null > $TMPRESINFO
+                               ATLAS_SITENAME="`cat $TMPRESINFO | grep '^ATLAS_SITENAME=' | tail -n 1 | cut -d= -f 2-`"
+                               SITENAME="`cat $TMPRESINFO | grep '^SITENAME=' | tail -n 1 | cut -d= -f 2-`"
+                               GNAME="`cat $TMPRESINFO | grep '^GRID=' |tail -n 1 | cut -d= -f 2-`"
+                               if [ -n "$SITENAME" ] ; then
+                                   [ -z "$ATLAS_SITENAME" ] && ATLAS_SITENAME=$SITENAME
+                                   ljsfinfo.py --status=inconsistent --rel=$RELVER --cs=$cs
+                                   ljsfreq.py --cs=$cs --rel=$RELVER --reqtype=removal --atlas-sitename=$ATLAS_SITENAME --sitename=$SITENAME --status=autorun --grid-name=$GNAME --default-site-status=$DSSTATUS
+                               else
+                                   echo "Cannot find any sitename for $cs"
+                               fi
+                           fi
+                       fi
+                   done
+               fi
+           done
+
+           rm -f $TMPRLOBS $TMPRLALL
+       fi
+   done
+fi
+
+# Fix slave validations
+#echo "Fixing slave validations"
+#for SLAVEVAL in `ljsf get release dstat status=waiting`; do
+#    SLAVEREL="`echo $SLAVEVAL | cut -d, -f 1`"
+#    SLAVERES="`echo $SLAVEVAL | cut -d, -f 3`"
+#    MASTERRES="`ljsf get resource master name=$SLAVERES`"
+#    MASTERSTATUS="`ljsf get release dstat name=$SLAVEREL resource=$MASTERRES | cut -d, -f 4`"
+#    case $MASTERSTATUS in
+#        installed)
+#            SREQDATA="`ljsf request list cs=$SLAVERES reqtype=validation release=$SLAVEREL status=accepted`"
+#            SREQID="`echo $REQDATA | cut -d, -f 1`"
+#            agis-tags --add --rel=$SLAVEREL -R $SLAVERES
+#            if [ $? -eq 0 -a -n "$SREQID" ] ; then
+#                ljsf set request status id=$SREQID status=done
+#                $slaverc=$?
+#            fi
+#            ;;
+#        removed)
+#            SREQDATA="`ljsf request list cs=$SLAVERES reqtype=removal release=$SLAVEREL status=accepted`"
+#            SREQID="`echo $REQDATA | cut -d, -f 1`"
+#            agis-tags --remove --rel=$SLAVEREL -R $SLAVERES
+#            if [ $? -eq 0 -a -n "$SREQID" ] ; then
+#                ljsf set request status id=$SREQID status=done
+#                $slaverc=$?
+#            fi
+#            ;;
+#        failed|closed|cancelled|maxinstretry|maxrmretry)
+#            SREQDATA="`ljsf request list cs=$SLAVERES release=$SLAVEREL status=accepted`"
+#            SREQID="`echo $REQDATA | cut -d, -f 1`"
+#            SREQTYPE="`echo $REQDATA | cut -d, -f 3`"
+#            [ "$SREQTYPE" == "removal" ] && TAGCTION="--add" || TAGACTION="--remove"
+#            agis-tags ${TAGACTION} --rel=$SLAVEREL -R $SLAVERES
+#            $slaverc=$?
+#            if [ $slaverc -eq 0 -a -n "$SREQID" ] ; then
+#                ljsf set request status id=$SREQID status=stopped
+#                $slaverc=$?
+#            fi
+#            ;;
+#    esac
+#    if [ $slaverc -eq 0 ] ; then
+#        ljsf set release dstat name=$SLAVEREL resource=$SLAVERES status=$MASTERSTATUS
+#        if [ $? -eq 0 ] ; then
+#            echo "Release $SLAVEREL on slave resource $SLAVERES set to $MASTERSTATUS"
+#        else
+#            echo "Failed to set release $SLAVEREL on slave resource $SLAVERES to $MASTERSTATUS" 
+#        fi
+#    fi
+#done
+
+for GN in `echo $GRIDNAME | sed 's/,/ /g'`; do
+   [ "$RESTARTREL" = "ALL" ] && RESTARTREL="%"
+
+   # Restart failed installations
+   if [ -n "$RESTARTREL" ] ; then
+       TMPRLPROD=/tmp/rellist.gc.obsolete.$$
+
+       ljsfinfo.py --queryrel=$RESTARTREL --autoinstall --production | sort > ${TMPRLPROD}.ai
+       ljsfinfo.py --queryrel=$RESTARTREL --cvmfs-available --production | sort > ${TMPRLPROD}.cvmfs
+       cat ${TMPRLPROD}.ai ${TMPRLPROD}.cvmfs | sort | uniq > ${TMPRLPROD}
+       rm -f ${TMPRLPROD}.*
+
+       cat $TMPRLPROD | while read l; do
+           RELVER="`echo $l | sed 's/.*\"RELEASE=\([^\"]*\)\".*/\1/'`"
+           echo "Restarting all the validation tasks of release $RELVER"
+           TMPRESTART="/tmp/ljsfi.rr.$$.tmp"
+           [ ! -f ${EXCLLST} ] && touch ${EXCLLST}
+           [ -n "$DEBUG" ] && echo "ljsfreq.py --query --rel=$RELVER --status=$REQSTATUS --reqtype=validation --grid-name=$GN $CEREQ | cut -d ',' -f 1,4,6 | grep -v -f ${EXCLLST}"
+           ljsfreq.py --query --rel=$RELVER --status=$REQSTATUS --reqtype=validation --grid-name=$GN $CEREQ | cut -d ',' -f 1,4,6 | grep -v -f ${EXCLLST} > $TMPRESTART
+           TOTJOBS="`cat $TMPRESTART | wc -l`"
+           [ -n "$VERBOSE" -o -n "$DEBUG" ] && echo "${TOTJOBS} requests found"
+
+           cat $TMPRESTART | while read i; do
+               [ "$COUNT" == "" ] && let COUNT=0
+               let COUNT=$COUNT+1
+               RESTART="yes"
+               JOBREQ="`echo $i | cut -d',' -f 1`"
+               RELNAME="`echo $i | cut -d',' -f 2`"
+               JOBRES="`echo $i | cut -d',' -f 3`"
+               CENAME="`echo $JOBRES | cut -d':' -f 1`"
+               #RELTAG="`ljsfinfo.py --rel=$RELNAME --show-reltag --cache --cache-timeout 7200 2>&1`"
+               RELTAG="`ljsf get release tag name=$RELNAME quiet noquote 2>&1`"
+               if [ "$ALLREQ" != "yes" ] ; then
+                   #JOBSTATUS="`ljsfbkk.py --select=job.status --request=$JOBREQ --last=1 --quiet | cut -d',' -f 2 | sed 's/^ *//;s/ *$//' | tr a-z A-Z`"
+                   JOBSTATUS="`ljsf get job status request=$JOBREQ last=1 quiet | cut -d',' -f 8 | sed 's/^ *//;s/ *$//' | tr a-z A-Z`"
+                   [ "$FILTER" != "" -a "$JOBSTATUS" != "$FILTER" ] && RESTART="no"
+                   grep \^${JOBRES}\$ $TMPCELIST &> /dev/null
+                   [ $? -ne 0 ] && RESTART="no"
+                   [ "$DEBUG" != "" -a "$RESTART" == "no" ] && echo "Filtering out $CENAME for release $RELNAME"
+               fi
+               if [ "$RESTART" == "yes" ] ; then
+                   TMPRESINFO=${TMPSITEINFO}.`echo $JOBRES | sed 's#[-:/.]#_#g'`
+                   TMPRESTAG=${TMPTAGINFO}.`echo $JOBRES | sed 's#[-:/.]#_#g'`
+                   #[ ! -s "$TMPRESINFO" ] && ljsf-infosys --info --panda-resource $JOBRES --cache --cache-timeout 7200 2> /dev/null > $TMPRESINFO
+                   [ ! -s "$TMPRESINFO" ] && ljsf get resource info name=$JOBRES 2> /dev/null > $TMPRESINFO
+                   [ ! -s "$TMPRESTAG" -a "$IGNORETAGS" != "yes" ] && show-tags -a $JOBRES 2> /dev/null > $TMPRESTAG
+                   [ ! -s "$TMPRESTAG" ] && touch $TMPRESTAG
+                   ATLAS_SITENAME="`cat $TMPRESINFO | grep '^ATLAS_SITENAME=' | tail -n 1 | cut -d= -f 2-`"
+                   SITENAME="`cat $TMPRESINFO | grep '^SITENAME=' | tail -n 1 | cut -d= -f 2-`"
+                   OSNAME="`cat $TMPRESINFO | grep '^OSNAME=' | tail -n 1 | cut -d= -f 2`"
+                   OSRELEASE="`cat $TMPRESINFO | grep '^OSRELEASE=' | tail -n 1 | cut -d= -f 2`"
+                   OSVERSION="`cat $TMPRESINFO | grep '^OSVERSION=' | tail -n 1 | cut -d= -f 2`"
+                   GNAME="`cat $TMPRESINFO | grep '^GRID=' |tail -n 1 | cut -d= -f 2-`"
+                   RELSTAT="`ljsfinfo.py --select=release_stat.status --rel=$RELNAME --cs=$JOBRES --quiet | sed 's/"//g'`"
+                   [ "$RELSTAT" == "maxinstretry" -o "$RELSTAT" == "aborted" ] && RESTART="no"
+                   [ -z "$SITENAME" ] && RESTART="no"
+                   [ -n "$SITEREQ" -a "$SITEREQ" != "$SITENAME" ] && RESTART="no"
+                   [ "$GN" != "ALL" -a "$GNAME" != "$GN" ] && RESTART="no"
+                   [ "$DEBUG" != "" ] && echo "$CENAME belongs to site name $SITENAME"
+               fi
+
+               if [ "$RESTART" == "yes" -a $MAXFAILURES -gt 0 ] ; then
+                   FAILURES="`ljsfbkk.py --select=job.exit_code --dest=$CENAME --last=$((MAXFAILURES+1)) --quiet --rel=$RELNAME | grep -v ^0 | wc -l`"
+                   if [ $FAILURES -gt $MAXFAILURES ] ; then
+                       [ -n "$VERBOSE" ] && echo "Too many failures ($FAILURES) for release $RELNAME in $JOBRES"
+                       if [ "$TRIAL" == "yes" ] ; then
+                           #echo ljsfinfo.py --status=maxinstretry --rel=$RELNAME --cs=$JOBRES
+                           echo ljsf set release dstat name=$RELNAME resource=$JOBRES status=maxinstretry
+                       else
+                           #ljsfinfo.py --status=maxinstretry --rel=$RELNAME --cs=$JOBRES
+                           ljsf set release dstat name=$RELNAME resource=$JOBRES status=maxinstretry
+                       fi
+                       RESTART="no"
+                   else
+                       [ -n "$DEBUG" ] && echo "Number of failures for release $RELNAME in $JOBRES - $FAILURES [OK]"
+                   fi
+               fi
+               if [ "$RESTART" == "yes" ] ; then
+                   if [ -n "$SITENAME" ] ; then
+                       [ -z "$ATLAS_SITENAME" ] && ATLAS_SITENAME=$SITENAME
+                       SITENAME_OPT=" --atlas-sitename=${ATLAS_SITENAME} --sitename=${SITENAME}"
+                   else
+                       SITENAME_OPT=""
+                   fi
+                   [ -n "$DEBUG" -o -n "$VERBOSE" ] && echo "Restarting release $RELNAME in $JOBRES [$GNAME] ([${COUNT}/${TOTJOBS}] $(((100*COUNT)/TOTJOBS))% done - $GN)"
+                   if [ "$TRIAL" == "yes" ] ; then
+                       echo ljsfreq.py --update --status=autorun --reqid=$JOBREQ $SITENAME_OPT --grid-name=$GNAME
+                   else
+                       ljsfreq.py --update --status=autorun --reqid=$JOBREQ --grid-name=$GNAME $SITENAME_OPT &> /dev/null
+                   fi
+               fi
+           done
+           [ -f "$TMPRESTART" ] && rm -f $TMPRESTART
+       done
+       [ -f "$TMPRLPROD" ] && rm -f $TMPRLPROD
+   fi
+done
+
+
+# Cleanup
+[ -f "$TMPCELIST" ]  && rm -f $TMPCELIST
+[ -f "$TMPREQLIST" ] && rm -f $TMPREQLIST
+rm -f ${EXCLLST}
+rm -f ${TMPSITEINFO} ${TMPSITEINFO}.*
+rm -f ${TMPTAGINFO} ${TMPTAGINFO}.*
+rm -f ${TMPRELINFO} ${TMPRELINFO}.*
+[ -f "$TMPINSTLIST" ] && rm -f $TMPINSTLIST
+
+exit

@@ -1,0 +1,31 @@
+<HTML>
+<HEAD>
+<META HTTP-EQUIV="refresh" CONTENT="30">
+<TITLE>LJSFi AutoInstall Daemon Controller</TITLE>
+<LINK REL="STYLESHEET" TYPE="text/css" HREF="ai.css">
+</HEAD>
+<BODY>
+
+<TABLE id='select_tbl' border="1" rules="groups">
+<TH COLSPAN=2>LJSFi AutoInstaller Web Interface</TH>
+<COLGROUP width="200"></COLGROUP>
+<TR><TD CLASS="selection" nowrap>Agent Name</TD><TD>@IDENT@</TD></TR>
+<TR><TD CLASS="selection" nowrap>Date</TD><TD>@DATE@</TD></TR>
+<TR><TD CLASS="selection" nowrap>Status</TD><TD>@STATUS@</TD></TR>
+<TR><TD CLASS="selection" nowrap>Request Handler Status</TD><TD>@REQUESTSTATUS@</TD></TR>
+<TR><TD CLASS="selection" nowrap>Autoabort Handler Status</TD><TD>@ABORTSTATUS@</TD></TR>
+<TR><TD CLASS="selection" nowrap>Output Retrieval Handler Status</TD><TD>@GETOUTPUTSTATUS@</TD></TR>
+<TR><TD CLASS="selection" nowrap>Active Requests</TD><TD>@REQUESTS@</TD></TR>
+<TR><TD CLASS="selection" nowrap>Active Jobs</TD><TD>@JOBS@</TD></TR>
+<TR><TD CLASS="selection" nowrap>Proxy Time Left</TD><TD>@PROXYTL@</TD></TR>
+<TR><TD COLSPAN=2>
+<BR><CENTER>
+<FORM METHOD="POST" enctype='multipart/form-data' NAME="form1" ACTION="index.html">
+<INPUT TYPE="submit" NAME="stop" VALUE="Stop Agent">
+</FORM>
+</CENTER>
+</TD></TR>
+</TABLE>
+
+</BODY>
+</HTML>

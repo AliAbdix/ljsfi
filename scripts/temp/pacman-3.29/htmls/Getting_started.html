@@ -1,0 +1,158 @@
+<title>Getting Started: -get and -remove</title>
+<body background="sky.gif">
+<p>
+<h1><font color=navy>Getting Started: -get and -remove</font></h1>
+<p>
+<hr size=5>
+<p>
+Grab a copy of Pacman from <a href="http://physics.bu.edu/pacman/" target="_blank">Pacman
+Headquarters</a>.  Unzip/tar it someplace, cd into the directory and do <b>% source setup.csh</b>
+or <b>% source setup.sh</b> depending on your shell. cd to a scratch directory somewhere and do 
+<b>% pacman -version</b> to make sure that you have Pacman version 3.0 or greater.
+You're now ready to use Pacman.  
+<p>
+At the user level, Pacman has two main concepts: <i>Packages</i> and <i>Caches</i>.  
+<dl>
+<dt><h2><font color=navy>Packages</font></h2></dt>
+<dd>A <i>package</i> is a description of a software environment in the <a href="Language_overview.html">Pacman language</a>. 
+A package may be a single piece of software like <b>Python v 2.2.3</b> or a complex multi-package environment.
+</dd>
+<dt><h2><font color=navy>Caches</font></h2></dt>
+<dd>A <i>cache</i> is a source of packages.</dd>
+</dl>
+An easy way to get familiar with packages and caches is to install some software.  Let's start with a nice text editing application
+called <b>nEdit</b>.  The package <b>nEdit</b> can be found in the cache <b>BU</b>.  To get this software, all you have to do is
+<pre><b><font color="#8B0000">% pacman -get BU:nEdit
+</font></pre></b>
+Assuming that you agree to trust the cache <b>BU</b> (see below), installation may take from a few seconds to a few minutes to finish, depending on your internet connection.  If the installation succeeds, you will have
+<b>nEdit</b> available to you.  If the installation fails, you will get an error message.  Here we come to an important point about Pacman - what to
+do if an installation fails:
+<p>
+<ul>
+<li>
+<font color="#8B0000"><i><b>If a Pacman installation or configuration or setup fails without giving you a sensible error message,
+don't try to fix the installation yourself.  Instead, you should complain to the person who manages the cache that you are using and quit!
+</b></i></font>
+<p>
+</ul>
+If you follow this principle, then problems can be solved once for everyone by a cache manager rather than everyone repeatedly running into the same
+problems.  The best way to help is to just complain and wait for a solution.  In the case of registered caches, you can get a list of 
+who to complain to by doing <b>% pacman -registry</b>.  
+<p>
+Notice, also, that you had to indicate that you trusted the cache <b>BU</b> before Pacman would do anything.  This is necessary because Pacman is
+downloading and executing instructions from the cache and executing them.  In general, then, 
+<p>
+<ul>
+<li>
+<font color="#8B0000"><i><b>Only agree to trust a cache if you are sure of it's location and management.
+</b></i></font>
+<p>
+</ul>
+Pacman provides several tools for you to gain confidence in remote caches.  For example, you can browse the source code before it is executed (see <b>-l</b> and
+<b>-lc</b> below).  You can also execute the installation one step at a time using <b>-ask</b>.  Caches can also be accessed via ssh rather than http
+where access and authentication is handled by the standard ssh mechanisms.
+<p>
+In any case, try the <b>nEdit</b> install and while it's downloading, notice the following points:
+<ol>
+<li> All Pacman operations are accomplished by doing <b>% pacman</b> with various unix-style command-line options.  You can see
+what the options are by doing <b>% pacman -help</b>.
+<li> Pacman keeps a registry of symbolic names like "<b>BU</b>" which get translated to URLs. 
+You can use full URLs instead of symbolic names if you like or if you want to trust a cache that's not in the
+registry.  Do <b>% pacman -registry</b> to see your current set of symbolic names.
+<li> The <b>-get</b> part of the command line tells Pacman to fetch, install and setup the packages that you specify on the
+command line.  For command line options, do <b>% pacman -help</b>.
+<li> Pacman asks you if you trust <b>BU</b> before proceeding.  Pacman will only use a cache if you
+agree to trust it.  The list of caches that you are currently trusting is kept in a file called <b>trusted.caches</b> in your
+current directory.  Pacman will modify this file as you agree to trust more caches, but you can also edit the file
+yourself at any time.  If you do not specify a cache on the command line, Pacman will search the caches in the 
+<b>trusted.caches</b> file in order.
+<li> While the command is executing, several messages appear in your shell related to downloading, untarring,
+and so on.  You can adjust what kinds of messages you get using the <b>-v</b> switch.  Do 
+<b>% pacman -v help</b> to see the options.
+<li> Pacman commands always refer to the installation in the current working directory.  To add and remove
+packages to this installation, you must <b>% cd</b> to this location.
+</ol>
+If the installation of <b>BU:nEdit</b> succeeds, you will see that your directory now contains six files 
+<pre><b><font color="#8B0000">% ls
+o..pacman..o  nedit-5.3  setup.csh  setup.py  setup.sh  trusted.caches
+</font></pre></b>
+Besides the <b>trusted.caches</b> file, Pacman also produces and maintains <b>setup.csh</b>, 
+<b>setup.sh</b> and <b>setup.py</b>. 
+To set up whatever software you have installed, just source <b>setup.csh</b> or 
+<b>setup.sh</b> depending on your shell.  In this particular case, source the appropriate setup file and you can then 
+do <b>% nEdit</b> to use the editor.  Each installation has at most one set of setup files.  Sourcing the appropriate
+file (from any location) always sets up all of the software contained in your installation.  You shouldn't edit these
+files by hand because they are regenerated by Pacman.
+<p>
+Finally the "<b>o..pacman..o</b>" file let's you know that the current directory 
+contains a Pacman installation.  It's actually a directory containing Pacman's internal representation of your environment.
+<p>
+     Now let's add some more software to your installation with the following command
+<pre><b><font color="#8B0000">% pacman -get BU:Python nEdit Pacman:Pacman
+</font></pre></b>
+and notice that
+<ol>
+<li> You can specify multiple packages on the command line.
+<li> <b>Python</b> depends on another package called <b>PythonDocs</b> which is automatically installed when you install Python.
+<li> It does no harm if you already have <b>nEdit</b> installed.
+<li> The package <b>Pacman</b> from the cache <b>Pacman</b> is a convenient way to treat <b>Pacman</b> in the same way that you treat
+any other package.  After doing this, you can throw away your original untarred copy of Pacman.
+</ol>
+
+The <b>-l</b> command line switch let's you browse the contents of your installation.  For instance, do
+<pre><b><font color="#8B0000">% pacman -l
+[*] Python, in cache [/home/youssef/Pacman/work]
+    [*] PythonDocs, in cache [/home/youssef/Pacman/work]
+[*] nEdit, in cache [/home/youssef/Pacman/work]
+[*] Pacman, in cache [/home/youssef/Pacman/work]
+</font></pre></b>
+to see a dependency tree view of the packages in your installation.
+The boxed character in front of each package indicates it's status. The "<b><font color="#8B0000">[*]</font></b>" mean that each of the package has
+successfully installed.  A package which can't be intalled on your system is indicated by "<b><font color="#8B0000">[X]</font></b>" and 
+"<b><font color="#8B0000">[ ]</font></b>" indicates a package which might install correctly but the installation hasn't been attempted.
+In general, commands of the form <b>% pacman -l {package 1} {package 2}...</b> let you browse packages in your installation
+with display options controlled by the <b>-d</b> switch.  For example, try
+<pre><b><font color="#8B0000">% pacman -d src -l Python
+</font></pre></b>
+to list the source code of the <b>Python</b> package and it's dependents.  You can also list all the packages in your 
+installation cache in alphabetic order by doing <font color="#8B0000"><b>% pacman -lc .</b></font>.
+
+You can use same <b>-l</b> and <b>-lc</b> commands to browse remote caches as well.  For example 
+<pre><b><font color="#8B0000">% pacman -d 2 -l VDT:Condor
+[ ] Condor, in cache [http://www.cs.wisc.edu/vdt/vdt_cache/]
+    [ ] Condor-Installer, in cache [http://www.cs.wisc.edu/vdt/vdt_cache/]
+        [ ] Condor-Environment, in cache [http://www.cs.wisc.edu/vdt/vdt_cache/]...
+        [ ] Condor-Base, in cache [http://www.cs.wisc.edu/vdt/vdt_cache/]...
+        [ ] VDT-Common, in cache [http://www.cs.wisc.edu/vdt/vdt_cache/]...
+        [ ] VDT-Environment, in cache [http://www.cs.wisc.edu/vdt/vdt_cache/]...
+        [ ] Licenses, in cache [http://www.cs.wisc.edu/vdt/vdt_cache/]...
+    [ ] Condor-Environment, in cache [http://www.cs.wisc.edu/vdt/vdt_cache/]
+        [ ] VDT-Common, in cache [http://www.cs.wisc.edu/vdt/vdt_cache/]...
+        [ ] VDT-Environment, in cache [http://www.cs.wisc.edu/vdt/vdt_cache/]...
+</font></pre></b>
+displays the package <b>Condor</b> from the cache <b>VDT</b> to maximum depth <b>2</b>, and 
+<pre><b><font color="#8B0000">% pacman -lc BU
+</font></pre></b>
+lists the contents of the <b>BU</b> cache.
+<p>
+<h3><font color=navy>Removing packages</font></h3>
+<p>
+When removing packages, it is important to use the Pacman mechanisms for this rather then just doing <b>% rm -r -f </b> in the
+installation area.  The reason for this is that, in general, Pacman packages may modify files outside of your installation area.  To see if this
+is true, use
+<pre><b><font color="#8B0000">% pacman -domain
+</font></pre></b>
+and you will see all parts of your system Pacman has modified or is keeping track of.  To remove software correctly, use, for example,
+<pre><b><font color="#8B0000">% pacman -remove
+</font></pre></b>
+This removes all packages from your installation recursively.  See <b>% pacman -help</b> for more details.
+<p>
+Finally, when you are done, do
+<pre><b><font color="#8B0000">% pacman -remove-all
+</font></pre></b>
+to remove all packages in your installation and remove the installation itself.
+<p>
+<hr size=5>
+<h3><a href="http://physics.bu.edu/pacman/" target="_blank">Pacman Headquarters</a></h3>
+<p>
+</body>

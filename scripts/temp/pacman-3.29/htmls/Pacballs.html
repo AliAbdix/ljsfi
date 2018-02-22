@@ -1,0 +1,35 @@
+<title>Making and using "pacballs"</title>
+<body background="sky.gif">
+<p>
+<h1><font color=navy>Making and using "pacballs"</font></h1>
+<p>
+<hr size=5>
+<p>
+   Pacman allows you to make a machine independent, self-contained, self-installing, un-updateable 
+"pacball" script from any package.  Given a pacball, installing the package consists of just executing
+the pacball script.  This means that installers don't need to use Pacman and don't need to have
+internet access.  Let's see how it works...
+<p>
+To to a fresh working directory and do<pre><b><font color="#8B0000">% pacman -pacball Demo:Test</font></pre></b>
+when this is finished, you'll find a file<pre><b><font color="#8B0000">Test.md5-8005fc0df87dda07c5c147389ea453d3.sh</font></pre></b>
+This file is the self-installing pacball script for <b>Demo:Test</b>.  To install <b>Test</b>, simply execute this script in
+any fresh directory.  Because pacballs and their resulting installations can't be updated, pacballs provide a convenient
+way of archiving software environments.  Because of this, an md5-checksum of the contents of the file is included in the
+name of all pacballs to uniquely identify the software.
+<p>
+    Given a pacball such as <b>Test.md5-8005fc0df87dda07c5c147389ea453d3.sh</b> an optional argument allows you to install
+any package contained in it individually, for instance<pre><b><font
+color="#8B0000">Test.md5-8005fc0df87dda07c5c147389ea453d3.sh Pacman</font></pre></b> will, in this case, install just
+Pacman.  
+<p>
+When creating a pacball, the optional argument <b>-default PACKAGE_NAME</b> let's you specify which package is
+installed by default when the pacball script is executed.
+<p>
+On some systems, if a pacball is greater than 2G in size an error to the effect "script too large" will
+occur when you try to execute the pacball.  If this happens, using "% bash <b>script</b>" instead of "%
+<b>script</b>" will work. 
+<p>
+<hr size=5>
+<h3><a href="http://physics.bu.edu/pacman/" target="_blank">Pacman Headquarters</a></h3>
+<p>
+</body>

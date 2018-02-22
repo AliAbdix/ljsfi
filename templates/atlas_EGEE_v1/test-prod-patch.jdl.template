@@ -1,0 +1,9 @@
+Executable = "sw-mgr";
+InputSandbox = {"SCRIPTPATH/sw-mgr","SCRIPTPATH/gbb","SCRIPTPATH/lcg-tags"};
+OutputSandbox = {"stdout", "stderr", "install.xml"};
+stdoutput = "stdout";
+stderror = "stderr";
+Arguments = "--test RELNAME -l LOGPATH/RELMAIN -p PHYSPATH/VERSIONAREA -P SWNAME -T patch -t ARCH -O opt --require-prj REQPRJ --host CENAME --subcluster SCNAME --vo atlas --tags RELTAG -m PACMANVERSION --xml install.xml --dump-tags $VO_ATLAS_SW_DIR/tags KV_POST_OPT DBREL";
+Environment = {"LCG_CATALOG_TYPE=LCGCATALOGTYPE","LFC_HOST=LFCHOST"};
+VirtualOrganisation = "atlas";
+Requirements = other.GlueCEUniqueId=="CEID";

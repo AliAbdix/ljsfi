@@ -1,0 +1,29 @@
+# Get current job status
+getStatus()
+{
+  TMPFILE=tmp.status.$$
+  JOBID=$1
+  shift
+  OPTS="$@"
+  gbb -l 900 $LJSF_JOBSTATUS $JOBID >& $TMPFILE
+  STATUS=`grep "Current Status" $TMPFILE | cut -d: -f 2 | sed -e 's#^ *##' -e 's# *$##' `
+  REASON="`grep "Status Reason" $TMPFILE | cut -d: -f 2- | sed -e 's#^ *##' -e 's# *$##' -e "s#'##g"`"
+  DEST=`grep "Destination" $TMPFILE | cut -d: -f 2 | sed -e 's#^ *##' -e 's# *$##' `
+  CS=`grep "Destination" $TMPFILE | cut -d: -f 2- | sed -e 's#^ *##' -e 's# *$##' `
+  REACH=`grep "reached on" $TMPFILE | cut -d: -f 2- | sed -e 's#^ *##' -e 's# *$##' `
+  [ "$REACH" == "" ] && REACH=`grep "^Submitted" $TMPFILE | cut -d: -f 2- | sed -e 's#^ *##' -e 's# *$##' `
+  EXITCODE=`grep -i "^Exit code" $TMPFILE | cut -d: -f 2 | sed -e 's#^ *##' -e 's# *$##' `
+  rm -f $TMPFILE
+  REACHDATE="`date -d \"$REACH\" +'%Y-%m-%d %H:%M:%S' 2>/dev/null`"
+  if [ $? -ne 0 ] ; then
+    REACH="`echo $REACH | sed 's/CEST/CET/g'`"
+    REACHDATE="`date -d \"$REACH\" +'%Y-%m-%d %H:%M:%S' 2>/dev/null`"
+  fi
+  if [ "$EXITCODE" != "" ] ; then
+    echo "$STATUS|$DEST|$REACH|$EXITCODE"
+    ljsfbkk.py --insert --jobid="$JOBID" --reachtime="$REACHDATE" --status="$STATUS" --statreason="$REASON" --dest="$DEST" --cs="$CS" --exit="$EXITCODE" $OPTS
+  else
+    echo "$STATUS|$DEST|$REACH"
+    ljsfbkk.py --insert --jobid="$JOBID" --reachtime="$REACHDATE" --status="$STATUS" --statreason="$REASON" --dest="$DEST" --cs="$CS" $OPTS
+  fi
+}

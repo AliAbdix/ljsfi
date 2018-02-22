@@ -1,0 +1,5 @@
+#!/bin/sh
+
+ljsfbkk.py --select=job.requestfk --status=activated --validation=pending --cs=$1 --quiet | while read req; do
+    ljsfreq.py --update --reqid=$req --status=autoabort
+done

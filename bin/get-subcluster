@@ -1,0 +1,58 @@
+#!/bin/sh
+
+################################
+# Get a suitable subcluster name
+# A. De Salvo - 2010
+# LJSFi framework v1.9
+
+help()
+{
+  echo "HELP"
+  echo "`basename $0`: Retrun a suitable subcluster name"
+  echo "Usage: `basename $0` [OPTIONS] <resource name>"
+  echo "       OPTIONS:"
+  echo "            -d|--debug          Output debug messages."
+  echo "            -h|--help           Display this help."
+  exit 0
+}
+
+# Get the command line options
+OPTS=`getopt -o dh -l debug,help -- "$@"`
+if [ $? != 0 ] ; then echo "Terminating..."; exit -1 ; fi
+eval set -- "$OPTS"
+while true ; do
+        case "$1" in
+                -h|--help)         help; shift;;
+                -d|--debug)        DEBUG="yes"; shift;;
+                --)                shift ; break ;;
+                \?)                break ;
+                exit ;;
+        esac
+done
+RESOURCE="${1}"
+
+# Check if a resource has been specified
+if [ "$RESOURCE" == "" ] ; then
+    echo "No resource specified."
+    exit 1
+fi
+
+CENAME="`echo ${RESOURCE} | cut -d: -f 1 | sed 's/ //g'`"
+TMPSITEINFO=/tmp/tmp.site.info.$$
+get-site-info ${RESOURCE} > ${TMPSITEINFO}
+SCNAME="`grep -i ^GlueSubClusterUniqueID: ${TMPSITEINFO} | tail -n 1 | cut -d: -f 2- | sed -e 's/^ *//g'`"
+CEHCLUSTER="`grep -i ^GlueCEHostinCluster: ${TMPSITEINFO} | tail -n 1`"
+rm -f ${TMPSITEINFO}
+[ -n "$DEBUG" ] && echo $SCNAME
+
+if [ -n "$SCNAME" -a "$CENAME" != "$SCNAME" ] ; then
+    SCNAME1="`ldapsearch -x -h ${LJSF_DEFBDII}:2170 -b 'o=grid' "GlueServiceDataKey=GlueSubClusterUniqueID:${SCNAME}" GlueServiceDataKey | grep ^GlueServiceDataKey | cut -d: -f3-`"
+    [ -n "$SCNAME1" ] && SCNAME="$SCNAME1"
+    NUMRTE="`echo $SCNAME | wc -w`"
+    [ "$NUMRTE" -ge 2 ] && unset SCNAME
+fi
+
+[ -z "$SCNAME" ] && SCNAME=$CENAME
+echo $SCNAME
+
+exit 0

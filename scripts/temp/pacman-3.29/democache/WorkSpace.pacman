@@ -1,0 +1,6 @@
+#
+#   This shows you how to make a workspace
+#
+workspace('scratch area', 'MY_SCRATCH',  1000,  'youssef', 'temporary')
+workspace(     'results', 'MY_RESULTS',  1000,  'youssef', 'userwrite permanent')
+

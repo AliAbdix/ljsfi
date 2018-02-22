@@ -1,0 +1,22 @@
+#!/bin/sh
+CE=${1}
+if [ "${CE}" == "" ] ; then
+    echo "Usage: reset-CE <CE FQDN>"
+    exit -1
+fi
+TMPFILE=/tmp/${CE}.tmp.$$
+ljsfreq.py --query --cename=${CE} --status=done | grep ${CE} > $TMPFILE
+ljsfreq.py --query --cename=${CE} --status=stopped | grep ${CE} >> $TMPFILE
+echo "Resetting `cat $TMPFILE | wc -l` installation requests"
+cat $TMPFILE | cut -d, -f 1 | while read reqid; do
+    ljsfreq.py --update --status=ignore --reqid=$reqid &> /dev/null
+done
+cat $TMPFILE | cut -d, -f4,6 | sort | uniq | while read reqiinfo; do
+    rel="`echo $reqiinfo | cut -d, -f 1`"
+    cs="`echo $reqiinfo | cut -d, -f 2`"
+    echo "Setting rel $rel to removed for $cs"
+    ljsfinfo.py --status=removed --rel=$rel --cs=$cs
+done
+rm -f $TMPFILE
+echo "Done"
+exit

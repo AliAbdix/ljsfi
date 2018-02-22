@@ -1,0 +1,6 @@
+Executable = "/bin/hostname";
+OutputSandbox = {"stdout","stderr"};
+stdoutput = "stdout";
+stderror = "stderr";
+VirtualOrganisation = "atlas";
+Requirements = ((other.GlueCEPolicyMaxCPUTime > 1000 || other.GlueCEPolicyMaxCPUTime == 0) && (other.GlueHostMainMemoryRAMSize >= 1000) && !Member("@RELTAG@",other.GlueHostApplicationSoftwareRunTimeEnvironment) && Member("RELREQ",other.GlueHostApplicationSoftwareRunTimeEnvironment) && (Member("VO-atlas-tier-T1",other.GlueHostApplicationSoftwareRunTimeEnvironment) || Member("VO-atlas-tier-T2",other.GlueHostApplicationSoftwareRunTimeEnvironment)));

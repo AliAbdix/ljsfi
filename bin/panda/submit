@@ -1,0 +1,59 @@
+#!/bin/sh
+###########################
+# Submit a job
+# A. De Salvo - 2013
+# LJSFi framework v2.0
+
+help()
+{
+  echo "Usage: `basename $0` [OPTIONS] <jdl 1> <jdl 2> ... <jdl n>"
+  echo "       OPTIONS:"
+  echo "            -A|--admin-id <id>  Set the admin user id to <id>"
+  echo "            -c|--conf <file>    Get configuration from <file>"
+  echo "            -d|--debug          Output debug messages."
+  echo "            -h|--help           Display this help."
+  echo "            -r|--request <id>   Specify the request id for this job."
+  echo "            -R|--resource <res> Specify the resource to submit to."
+  exit 0
+}
+
+# Get the command line options
+REQID_OPT=""
+INSTCONF=$CONFPATH/install.conf
+OPTS=`getopt -o A:c:dhr:R: -l admin-id:,conf:,debug,help,request:,resource: -- "$@"`
+if [ $? != 0 ] ; then echo "Terminating..."; exit -1 ; fi
+eval set -- "$OPTS"
+while true ; do
+        case "$1" in
+                -h|--help)         help; shift;;
+                -A|--admin-id)     ADMINID="--admin-id=$2"; shift 2;;
+                -c|--conf)         INSTCONF="$2"; shift 2;;
+                -d|--debug)        DEBUG="yes"; shift;;
+                -r|--request)      REQID_OPT="--request=$2"; shift 2;;
+                -R|--resource)     RESOURCE="$2"; shift 2;;
+                --)                shift ; break ;;
+                \?)                break ;
+                exit ;;
+        esac
+done
+
+source $INSTCONF
+source $BINPATH/$LJSF_CMDSET/submit.def
+
+#Check the DB status
+$BINPATH/dbcheck
+rc=$?
+[ $rc -ne 0 ] && exit $rc
+
+#Check the proxy status
+$BINPATH/check-proxy
+
+# Loop over the jdls
+let rc=0
+while [ "$1" != "" ] ; do
+  JDL=$1; shift
+  submitJDL "$RESOURCE" "$JDL"
+  let rc=$rc+$?
+done
+
+exit $rc

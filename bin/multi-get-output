@@ -1,0 +1,28 @@
+#!/bin/sh
+[ -z "$MAXTHREADS" ] && MAXTHREADS=5
+[ -z "$JOBLIMIT" ] && JOBLIMIT=0
+JOBFILES=($@)
+MAXJOBS=$((${#JOBFILES[@]}-1))
+JOBSOFFSET=0
+if [ $JOBLIMIT -gt 0 -a $MAXJOBS -gt $JOBLIMIT ] ; then
+    JOBSOFFSET=$((MAXJOBS*RANDOM/32768))
+    MAXJOBS=$JOBLIMIT
+fi
+THREADINDX=0
+echo "Job files: $MAXJOBS"
+STEP=$(((MAXJOBS+1)/MAXTHREADS+1))
+echo "OFFSET=$JOBSOFFSET"
+echo "STEP=$STEP"
+for JOB in `seq 0 $STEP $MAXJOBS`; do
+    echo -n "Thread #$((THREADINDX+1)):"
+    TCMD="get-output -nuz"
+    for JOBINDX in `seq 0 $((STEP-1))`; do
+        JOBNUM=$((JOBSOFFSET+JOBINDX+(THREADINDX*STEP)))
+        [ $JOBNUM -le $((JOBSOFFSET+MAXJOBS)) ] && TCMD="$TCMD ${JOBFILES[$JOBNUM]}"
+    done
+    echo $TCMD
+    $TCMD &
+    let THREADINDX=$THREADINDX+1
+done
+wait
+exit

@@ -1,0 +1,13 @@
+##############################################################
+# AutoRequest agent task change map                          #
+# (c) Alessandro De Salvo <Alessandro.DeSalvo@roma1.infn.it> #
+#     v1.1 - 11 June 2010                                    #
+##############################################################
+
+# Syntax:
+# <resource>,<from-task>,<to-task>
+
+#.*.cern.ch:.*,validation,test
+#.*.cern.ch:.*,installation,test
+#.*.cern.ch:.*,removal,remove-tag
+#.*.cern.ch:.*,cleanup,remove-tag

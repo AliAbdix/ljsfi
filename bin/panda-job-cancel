@@ -1,0 +1,7 @@
+#!/bin/sh
+
+#source $BINPATH/panda-setup
+
+panda-job-cancel.py $@
+
+exit $?

@@ -1,0 +1,27 @@
+<title>How to lock a source cache while you make changes</title>
+<body background="sky.gif">
+<p>
+<h1><font color=navy>How to lock a source cache while you make changes</font></h1>
+<p>
+<hr size=5>
+<p>
+Suppose that you're managing a Pacman source cache that remote users have installed from.  You might want to change the contents of
+your cache but only after doing some testing first.  There are several ways of dealing with this situation in Pacman (see the
+tutorials).  One simple thing you can do is lock the cache so that remote users can't install or update from your cache while you
+test the modified contents.  To do this, simply
+<ol>
+<li> Add a text file called <b>lock</b> to the top level directory of the cache. The first line of this file is an optional message
+to your users.
+<li> With the presence of the lock file, remote users will not be able to browse, install or update and will instead get an error
+message incorporating your error message.
+<li> Test the new contents of your cache as usual after doing
+<pre><b><font color="#8B0000">% pacman -allow lock-override
+</font></pre></b>
+once.
+</ol>
+When you are done testing, just remove the <b>lock</b> file.
+<p>
+<hr size=5>
+<h3><a href="http://physics.bu.edu/pacman/" target="_blank">Pacman Headquarters</a></h3>
+<p>
+</body>

@@ -1,0 +1,59 @@
+#!/bin/sh
+
+help()
+{
+  echo "HELP"
+  echo "`basename $0`: Return the dataset name and files of pacballs"
+  echo "Usage: `basename $0` [OPTIONS] <project> <version>"
+  echo "       OPTIONS:"
+  echo "            -d|--debug          Output debug messages."
+  echo "            -h|--help           Display this help."
+  echo "            -a|--arch           Architecture (default $ARCH)."
+  echo "            -r|--rel            Release number as defined in the DB."
+  echo "            -s|--set            Set the pacball data in the DB."
+  echo "            -h|--help           Display this help."
+  exit 0
+}
+
+# Defaults
+ARCH="i686_slc5_gcc43_opt"
+SETURL=${LJSFDBURL}/reldef.php
+PBDS_FIELD="relext_104"
+PBNM_FIELD="relext_105"
+
+OPTS=`getopt -o a:dhr:s -l arch:,debug,rel:,set,help -- "$@"`
+if [ $? != 0 ] ; then echo "Terminating..."; exit -1 ; fi
+eval set -- "$OPTS"
+while true ; do
+        case "$1" in
+                -a|--arch)         ARCH="${2}"; shift 2;;
+                -d|--debug)        DEBUG="yes"; shift;;
+                -r|--rel)          RELEASE="$2"; shift 2;;
+                -s|--set)          SETDATA="yes"; shift;;
+                -h|--help)         help; shift;;
+                --)                shift ; break ;;
+                \?)                break ;
+                exit ;;
+        esac
+done
+
+[ -n "$1" ] && PROJECT="$1" || PROJECT="AtlasProduction"
+if [ -n "$2" ] ; then
+    VERSION="`echo $2 | awk -F. '{for (i=1;i<=NF;i++) printf ("%02d", $i);}'`"
+else
+    echo "No version specified"
+    help
+    exit
+fi
+
+TMPPBDATA=/tmp/pb.data.$$
+dq2-ls -f sit*AtlasSWRelease.PAC.${PROJECT}.${ARCH}.v${VERSION} | egrep "^sit|${PROJECT}" | sed -e "s/^sit/DATASET=sit/" -e "s/.*${PROJECT}\(.*\).sh.*/PACBALL=${PROJECT}\1.sh/g" | awk '{print $1}' | tee $TMPPBDATA
+PBNAME="`cat $TMPPBDATA | head -n 2 | grep ^PACBALL | cut -d= -f 2-`"
+PBDS="`cat $TMPPBDATA | head -n 2 | grep ^DATASET | cut -d= -f 2-`"
+rm -f $TMPPBDATA
+
+if [ "$SETDATA" == "yes" -a -n "$PBNAME" -a -n "$PBDS" ] ; then
+    curl -s -S -k --cert ${LJSFAGENTCERT} --key ${LJSFAGENTKEY} -d "relsrc=new&mode=update&submit=Save&reldef_name=${RELEASE}&${PBNM_FIELD}=${PBNAME}&${PBDS_FIELD}=${PBDS}" ${SETURL} > /dev/null
+fi
+
+exit

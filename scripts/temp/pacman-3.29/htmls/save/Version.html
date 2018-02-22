@@ -1,0 +1,78 @@
+<title>Versions, releases, tags, natively installed software</title>
+<body background="sky.gif">
+<h1><font color=navy>Versions, releases tags, natively installed software</font></h1>
+<hr size=5>
+<p>
+<dl>
+<dt><font color=navy>version <i>(versionString)</i>, versionLE <i>(versionString)</i>, versionLT <i>(versionString)</i>, versionGE <i>(versionString)</i>,
+versionGT <i>(versionString)</i></font></dt>
+<dd>Version lets you assign a version string to a package.  Versions, releases and tags have no intrinsic meaning within Pacman; 
+they are just strings with standard lexical ordering.  Typically, one does something like 
+<b><pre><font color="#8B0000">version('1.1')  # this package is version 1.1
+</font></pre></b>
+in package Foo.  Then, in another package, you can do
+<b><pre><font color="#8B0000">package("Foo | { versionGE('1.0'); versionLT('2.0') OR version('3.0-beta') }")
+</font></pre></b>
+to select particular versions, or, similarly, on the command line
+<b><pre><font color="#8B0000">% pacman -get "Foo | { versionGE('1.0'); versionLT('2.0') OR version('3.0-beta') }"
+</font></pre></b>
+In the Pacman browsing functions, if you do <b>-l -d versions</b> or <b>-lc -d version</b> the versions of packages will be
+displayed.
+<p>
+<dt><font color=navy>release <i>(releaseString)</i>, releaseLE <i>(releaseString)</i>, releaseLT <i>(releaseString)</i>, releaseGE <i>(releaseString)</i>, 
+releaseGT <i>(releaseString)</i></font></dt>
+<dd>Identical to version above with "release" instead of "version."</dd>
+<p>
+<dt><font color=navy>tag <i>(tagString)</i>, tagLE <i>(tagString)</i>, tagLT <i>(tagString)</i>, tagGE <i>(tagString)</i>, 
+tagGT <i>(tagString)</i></font></dt>
+<dd>Identical to version above with "tag" instead of "version."</dd>
+<p>
+<dt><font color=navy>patch <i>(patchString)</i>, patchLE <i>(patchString)</i>, patchLT <i>(patchString)</i>, patchGE <i>(patchString)</i>, 
+patchGT <i>(patchString)</i></font></dt>
+<dd>Identical to version above with "option" instead of "version."</dd>
+<p>
+<dt><font color=navy>option <i>(optionString)</i>, optionLE <i>(optionString)</i>, optionLT <i>(optionString)</i>, optionGE <i>(optionString)</i>, 
+optionGT <i>(optionString)</i></font></dt>
+<dd>Identical to version above with "option" instead of "version."</dd>
+<p>
+<dt><font color=navy>versionTuple <i>(versionString[,sep])</i>, versionTupleLE <i>(versionString[,sep])</i>, versionTupleLT <i>(versionString[,sep])</i>, versionTupleGE <i>(versionString[,sep])</i>,
+versionTupleGT <i>(versionString[,sep])</i></font></dt>
+<dd>Similar to version above except that the version string is interpreted as a list of integers with the usual partial ordering rather than as a character string as
+in <b>version('1.22.11')</b>.  The second argument is an optional separator character which defaults to ".".
+</dd>
+<p>
+<dt><font color=navy>linuxKernel <i>(versionString)</i>, linuxKernelLE <i>(versionString)</i>, linuxKernelLT <i>(versionString)</i>, 
+linuxKernelGE <i>(versionString)</i>, linuxKernelGT <i>(versionString)</i></font></dt>
+<dd>These atoms let you require versions or version ranges of the standard linux kernel.</dd>
+<p>
+<dt><font color=navy>gccVersion <i>(versionString)</i>, gccVersionLE <i>(versionString)</i>, gccVersionLT <i>(versionString)</i>, 
+gccVersionGE <i>(versionString)</i>, gccVersionGT <i>(versionString)</i></font></dt>
+<dd>These atoms let you require versions or version ranges of gcc.</dd>
+<p>
+<dt><font color=navy>gccBinary <i>(path,versionString)</i>, gccBinaryLE <i>(path,versionString)</i>, gccBinaryLT <i>(path,versionString)</i>, 
+gccBinaryGE <i>(path,versionString)</i>, gccBinaryGT <i>(path,versionString)</i></font></dt>
+<dd>These let you test if a particular binary has been compiled with gcc versions as indicated.</dd>
+<p>
+<dt><font color=navy>pythonVersion <i>(versionString)</i>, pythonVersionLE <i>(versionString)</i>, pythonVersionLT <i>(versionString)</i>, 
+pythonVersionGE <i>(versionString)</i>, pythonVersionGT <i>(versionString)</i></font></dt>
+<dd>These atoms let you require versions or version ranges of python.</dd>
+<p>
+<dt><font color=navy>sshVersion <i>(versionString)</i>, sshVersionLE <i>(versionString)</i>, sshVersionLT <i>(versionString)</i>, 
+sshVersionGE <i>(versionString)</i>, sshVersionGT <i>(versionString)</i></font></dt>
+<dd>These atoms let you require versions or version ranges of SSH.</dd>
+<p>
+<dt><font color=navy>perlVersion <i>(versionString)</i>, perlVersionLE <i>(versionString)</i>, perlVersionLT <i>(versionString)</i>, 
+perlVersionGE <i>(versionString)</i>, perlVersionGT <i>(versionString)</i></font></dt>
+<dd>These atoms let you require versions or version ranges of the standard linux kernel.</dd>
+<p>
+<dt><font color=navy>pacmanVersion <i>(versionString)</i>, pacmanVersionLE <i>(versionString)</i>, pacmanVersionLT <i>(versionString)</i>, 
+pacmanVersionGE <i>(versionString)</i>, pacmanVersionGT <i>(versionString)</i></font></dt>
+<dd>These atoms let you require versions or version ranges of Pacman.</dd>
+</dl>
+<p>
+If you want to test versions of software not in this list, a good option is to use <a href="Shells.html">shellOutput, shellOutputLE</b></a>, etc.
+<p>
+<hr size=5>
+<h3><a href="http://physics.bu.edu/pacman/" target="_blank">Pacman Headquarters</a></h3>
+<p>
+</body>

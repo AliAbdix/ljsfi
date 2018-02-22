@@ -1,0 +1,356 @@
+#!/usr/bin/env python
+
+import getopt
+import os, sys
+import string
+import time
+import stat
+import signal
+import commands
+import re
+
+#
+#########################################################
+# GRID BigBrother client                                #
+# Alessandro De Salvo <Alessandro.DeSalvo@roma1.infn.it #
+# v0.1 - 20051104                                       #
+#########################################################
+#
+
+__version__ = "$Revision: 0.1 $"[11:-1]
+__author__  = "Alessandro De Salvo <Alessandro.DeSalvo@roma1.infn.it>"
+
+HELP="""
+gBB - Grid Big Brother client %s.
+Usage: gbbc [OPTIONS] <jobid> ...
+
+Options:
+  -b|--bdii <bdii name>        BDII server to use
+                               (default: %s).
+  -c|--clean                   clean up the files from the SE.
+  -d|--debug                   print debug messages.
+  -g|--get                     retrieve the output (default).
+  -h|--help                    display this help and exit.
+  -l|--list                    list the partial output files.
+  -o|--output <file>           write the output in <file>.
+  -P|--bdii-port <port>        BDII port to use (default: %d).
+  -r|--request                 request a partial output for this jobid.
+  -s|--server <server>         use <server> to dump the partial output.
+  -t|--tail <num>              only retrieve the last <num> fragments.
+  -T|--temp-dir <path>         use <path> to store temporary files.
+  -v|--verbose                 be verbose.
+
+%s
+"""
+
+__LDAPGETSAROOT__ = "ldapsearch -s sub -x -h %s -p %d -b \"mds-vo-name=local,o=grid\" \"(&(objectClass=GlueSATop)(GlueChunkKey=GlueSEUniqueID=%s)(GlueSALocalID=%s))\" GlueSARoot | grep ^GlueSARoot | sed 's#GlueSARoot: ##g' | cut -d: -f 2-"
+
+__GSIFTPLS__    = "edg-gridftp-ls %s 2>/dev/null | grep %s | sort"
+__GSIFTPCP__    = "globus-url-copy %s file:%s"
+__GSIFTPRM__    = "edg-gridftp-rm %s"
+__GSIFTPMKDIR__ = "edg-gridftp-mkdir --parents %s"
+
+__BDII__        = "atlas-bdii.cern.ch"
+__BDIIPORT__    = 2170
+__VO__          = "atlas"
+
+__PARTIALOUT__  = "out.part"
+__TMPFILE__     = "%s/gbbc.tmp"
+
+class gBBc:
+
+    # Command line switches
+    short_options = "hb:cdglo:prs:t:T:vV:"
+    long_options = ["help",       "clean",     "bdii=",
+                    "bdii-port=", "debug",     "get",
+                    "list",       "output=",   "request=",
+                    "server=",    "tail=",     "temp-dir=",
+                    "verbose",    "vo="]
+
+    # Defaults for actions
+    action                   = 'get'
+    maxRetries               = 5
+
+    # Other defaults
+    outputFileName           = None
+    verbose                  = False
+    debug                    = False
+    server                   = None
+    BDII                     = __BDII__
+    BDIIport                 = __BDIIPORT__
+    VO                       = __VO__
+    SARoot                   = None
+    tempDir                  = os.getcwd()
+    tmpfile                  = lambda self: __TMPFILE__ % self.tempDir
+    jobID                    = None
+    tail                     = 0
+
+
+    def __init__ (self):
+        # Get the command line options
+        try:
+            opts, args = getopt.getopt(sys.argv[1:],
+                         self.short_options,
+                         self.long_options,
+                         )
+        except getopt.GetoptError:
+            # Print the help
+            self.help()
+            sys.exit(-1)
+
+        # Local vars
+        cmd=''
+        arg=''
+        for cmd, arg in opts:
+            if cmd in ('--help','-h'):
+                self.help()
+                sys.exit()
+            elif cmd in ('--bdii','-b'):
+                self.BDII = arg
+            elif cmd in ('--bdii-port','-P'):
+                self.BDIIport = int(arg)
+            elif cmd in ('--clean','-c'):
+                self.action = 'clean'
+            elif cmd in ('--debug','-d'):
+                self.debug = True
+            elif cmd in ('--get','-g'):
+                self.action = 'get'
+            elif cmd in ('--list','-l'):
+                self.action = 'list'
+            elif cmd in ('--output','-o'):
+                self.outputFileName = arg
+            elif cmd in ('--request','-r'):
+                self.action = 'request'
+            elif cmd in ('--server','-s'):
+                self.server = arg
+            elif cmd in ('--tail','-t'):
+                self.tail = int(arg)
+            elif cmd in ('--temp-dir','-T'):
+                self.tempDir = arg
+            elif cmd in ('--verbose','-v'):
+                self.verbose = True
+
+        if (not self.server):
+            print "No SE specified."
+            sys.exit(-1)
+
+        if (len(args) == 0):
+            print "No jobid specified."
+            sys.exit(-1)
+
+        self.jobID = args[0].split('/')[-1]
+
+
+    def run(self):
+        # Get the SA Root of the SE
+        self.SARoot = self.getSARoot(self.BDII,self.BDIIport,self.server,self.VO)
+        if (len(self.SARoot) == 0):
+            sys.stderr.write("GBBC> Cannot retrieve the SA Root for %s.\n" % self.server)
+            return
+
+        # Get the certificate subject and check if the proxy is valid
+        proxyid = commands.getoutput("grid-proxy-info -identity 2>/dev/null")
+        if (len(proxyid) == 0):
+            sys.stderr.write("GBBC> Cannot retrieve the identity.\n")
+            return
+        identity = re.sub('^_','',re.sub('[^\w]','_',proxyid))
+
+        # Build the SE path
+        SEpath=("%s/%s" % (identity,self.jobID))
+
+        # Check which action to take
+        if (self.action == 'clean'):
+            if (self.verbose):
+                sys.stderr.write("GBBC> Cleaning up from the SE (%s).\n" % self.server)
+                sys.stderr.write("GBBC> Please wait, this may take a few minutes...\n")
+            self.clean(SEpath)
+        elif (self.action == 'get'):
+            if (self.verbose):
+                sys.stderr.write("GBBC> Getting partial output...\n")
+            self.getOutput(SEpath)
+        elif (self.action == 'list'):
+            if (self.verbose):
+                sys.stderr.write("GBBC> Listing partial output fragments...\n")
+            self.list(SEpath)
+        elif (self.action == 'request'):
+            if (self.verbose):
+                sys.stderr.write("GBBC> Requesting partial output...\n")
+            self.request(SEpath)
+        else:
+            sys.stderr.write("GBBC> Unknown action.\n")
+
+
+    def getOutput (self, SEpath):
+        files = self.gsiftpList(SEpath,__PARTIALOUT__)
+        if (self.verbose):
+            sys.stderr.write("GBBC> %d fragments found.\n" % len(files))
+        if (len(files) == 0): return
+        outfd = sys.stdout
+        if (self.outputFileName):
+            try:
+                outfd = open(self.outputFileName,'w')
+            except:
+                sys.stderr.write("GBBC> Cannot open %s for writing\n" % self.outputFileName)
+                sys.exit(-1)
+        if (self.verbose):
+            sys.stderr.write("GBBC> Merging fragments.\n")
+        index = 0
+        for file in files:
+            index = index + 1
+            if (index > (len(files)-self.tail) or self.tail == 0):
+                self.gsiftpGet(file,self.tmpfile())
+                try:
+                    infd = open(self.tmpfile(),'r')
+                    while 1:
+                        line = infd.readline()
+                        if (len(line) > 0):
+                            outfd.write(line)
+                        else:
+                            break
+                    infd.close()
+                except:
+                    pass
+                try:
+                    os.remove(self.tmpfile())
+                except:
+                    pass
+           
+            else:
+                if (self.debug):
+                    sys.stderr.write("GBBC> Skipping fragment %d.\n" % index)
+        if (self.outputFileName): outfd.close()
+
+
+    def clean(self, SEpath):
+        dir = self.gsiftpList(os.path.dirname(SEpath),os.path.basename(SEpath))
+        if (len(dir) > 0):
+            files = self.gsiftpList(SEpath,'.')
+            # First remove all the files in the directory
+            for URL in files:
+                self.gsiftpRemove(URL)
+            # Now remove the directory itself
+            URL   = "gsiftp://%s%s/%s" % (self.server,self.SARoot,SEpath)
+            self.gsiftpRemove(URL)
+
+
+    def list(self, SEpath):
+        files = self.gsiftpList(SEpath,'.')
+        for URL in files:
+            print os.path.basename(URL)
+
+
+    def request(self, SEpath):
+        dir = self.gsiftpList(os.path.dirname(SEpath),os.path.basename(SEpath))
+        URL = "gsiftp://%s%s/%s" % (self.server,self.SARoot,SEpath)
+        if (len(dir) > 0):
+            if (self.verbose):
+                sys.stderr.write("GBBC> Partial output already requested.\n")
+            sys.exit(1)
+        if (self.gsiftpMkdir(URL) == 0):
+            if (self.debug): sys.stderr.write("GBBC> Request successfull.\n")
+        else:
+            sys.stderr.write("GBBC> Unable to request partial output.\n")
+            sys.exit(2)
+
+
+    def enablePartialOutput(self, SEpath):
+        dest = "gsiftp://%s%s/%s" % (self.server, self.SARoot, SEpath)
+        path = commands.getoutput(__GSIFTPLS__ % (os.path.dirname(dest),
+                                                  os.path.basename(dest)))
+        if (path == os.path.basename(dest)):
+            return 1
+        else:
+            msg = commands.getoutput(__GSIFTPMKDIR__ % dest)
+            if (len(msg) == 0):
+                return 0
+            else:
+                sys.stderr.write("GBBC> Cannot create %s\n" % dest)
+                return 2
+
+
+    def getSARoot(self, BDII, port, SE, VO):
+        SARoot = commands.getoutput(__LDAPGETSAROOT__ % (BDII, port, SE, VO))
+        if (self.verbose):
+            sys.stderr.write("GBBC> %s SARoot: %s\n" % (SE, SARoot))
+        return SARoot
+
+
+    def gsiftpList(self,SEpath,filter):
+        URL   = "gsiftp://%s%s/%s" % (self.server,self.SARoot,SEpath)
+        res   = commands.getoutput(__GSIFTPLS__ % (URL,filter)).split()
+        files = []
+        for file in res:
+            files.append("%s/%s" % (URL,file))
+        return files
+        
+
+    def gsiftpGet(self,source,dest):
+        attempt = 0
+        while 1:
+            msg = commands.getoutput(__GSIFTPCP__ % (source,dest))
+            if (len(msg) == 0):
+                return 0
+            elif (attempt < self.maxRetries):
+                attempt = attempt + 1
+                sys.stderr.write("GBBC> GSIFTP copy failed. Retrying [%d]\n" % attempt)
+                time.sleep(1)
+            else:
+                sys.stderr.write("GBBC> GSIFTP copy failed: %s\n" % msg)
+                return 1
+
+
+    def gsiftpMkdir(self,URL):
+        attempt = 0
+        while 1:
+            msg = commands.getoutput(__GSIFTPMKDIR__ % URL)
+            if (len(msg) == 0):
+                return 0
+            elif (attempt < self.maxRetries):
+                attempt = attempt + 1
+                sys.stderr.write("GBBC> GSIFTP mkdir failed. Retrying [%d]\n" % attempt)
+                time.sleep(1)
+            else:
+                sys.stderr.write("GBBC> GSIFTP mkdir failed: %s\n" % msg)
+                return 1
+
+
+
+    def gsiftpRemove(self,URL):
+        attempt = 0
+        while 1:
+            msg = commands.getoutput(__GSIFTPRM__ % URL)
+            if (len(msg) == 0):
+                return 0
+            elif (attempt < self.maxRetries):
+                attempt = attempt + 1
+                sys.stderr.write("GBBC> GSIFTP remove failed. Retrying [%d]\n" % attempt)
+                sys.stderr.write("GBBC> Last command: %s\n" % (__GSIFTPRM__ % URL))
+                time.sleep(1)
+            else:
+                sys.stderr.write("GBBC> GSIFTP remove failed: %s\n" % msg)
+                return 1
+
+
+    def help(self):
+        # Print the help
+        print HELP % (__version__.strip(),self.BDII,self.BDIIport,self.VO,
+                                          __author__)
+
+
+# Signal handler
+def signalHandler(signal, frame):
+     sys.exit(0)
+
+
+# main class
+if __name__ == '__main__':
+    global gbbc
+
+    # Set up signal handlers
+    signal.signal(signal.SIGINT,  signalHandler)
+    signal.signal(signal.SIGTERM, signalHandler)
+
+    # Create a new gBB object
+    gbbc=gBBc()
+    # Start the gBB object
+    gbbc.run()

@@ -1,0 +1,47 @@
+<title>Making and using mirrors</title>
+<body background="sky.gif">
+<p>
+<h1><font color=navy>Making and using mirrors</font></h1>
+<p>
+<hr size=5>
+<p>
+   It is sometimes useful to "mirror" a remote Pacman cache either to speed up installation or to control when updates appear by
+controlling when the mirroring happens.  Pacman provides an automatic way of doing this called a mirror cache.  Mirror caches work
+almost the same way as snapshots do except that mirrors are updateable.  Let's try it out by mirroring a sample cache that comes with each copy of
+Pacman.
+<p>
+Go to a fresh working area and do <pre><b><font color="#8B0000">% pacman -mirror $PACMAN_LOCATION/democache -o test
+</font></pre></b>
+(the <b>-o test.mirror</b> is optional).  When this is finished, you will find a directory <b>test.mirror</b> in your current working 
+directory.  This is the mirror cache.  Just as with snapshots, this is self contained in the same sense, moveable, 
+machine independent and accessible from 
+other sites as well as locally.  You can move the directory elsewhere and rename it as long as you keep the mirror suffix.
+As with snapshots, mirrors are caches in every sense.  You can, for instance, do
+<pre><b><font color="#8B0000">% pacman -lc test.mirror
+</font></pre></b>
+or
+<pre><b><font color="#8B0000">% pacman -get test.mirror:Python
+</font></pre></b>
+and it all works quite a bit like it was a snapshot.  Just as with snapshots, you can mirror any combination of caches including, source caches,
+snapshots, local installations and other mirrors.
+<p>
+     The main point of mirrors is that they are updatable.  To try this, modify one of the packages in <b>$PACMAN_LOCATION/democache</b> and do
+<pre><b><font color="#8B0000">% pacman -update-check test.mirror
+% pacman -lc test.mirror
+</font></pre></b>
+Notice that this works the same way as updating an installation.  Similarly, to re-check and accept updated packages, just do
+<pre><b><font color="#8B0000">% pacman -update test.mirror
+</font></pre></b>
+<p>
+Because mirrors are updateable, you can use them to control when installation see that an update is available.  By installing from a mirror rather
+than directly, you may not only gain in speed, but it's also a mechanism to delegate the decision about when updates appears to the owner of the
+mirror cache (see tutorials). 
+<p>
+     Note that mirrors (like snapshots) can be used remotely via http, ssh or gsiftp just like other caches.  Mirrors have
+the limitation that you can only update them locally.  However, even at a remote site, you can use -update-check to
+find out if a remote mirror is up to date or not.
+<p>
+<hr size=5>
+<h3><a href="http://physics.bu.edu/pacman/" target="_blank">Pacman Headquarters</a></h3>
+<p>
+</body>

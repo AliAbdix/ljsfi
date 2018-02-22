@@ -1,0 +1,54 @@
+#!/bin/sh
+
+####################################
+#      Atlas Installer v1.0.1      #
+#      A. De Salvo, 17-04-2004     #
+# Alessandro.DeSalvo@roma1.infn.it #
+####################################
+
+# Get the version of the installation tools
+INSTTOOLSVER=$1; shift
+
+# Set the name of the installation scripts archive
+ATLAS_INSTALL_TOOLS=AtlasInstallTools-$INSTTOOLSVER
+ATLAS_INSTALL_TOOLS_PKG=$ATLAS_INSTALL_TOOLS.tar.gz
+LCG_SCRIPTS_RPM=lcg-ManageSoftware
+
+# Copy the LCG installation scripts to the working dir
+LCG_SCRIPTS=`rpm -ql $LCG_SCRIPTS_RPM | grep bin`
+if [ "$LCG_SCRIPTS" != "" ] ; then
+  cp $LCG_SCRIPTS .
+else
+  cp $LCG_LOCATION/bin/*.pl .
+  cp $LCG_LOCATION/bin/*.sh .
+  cp $LCG_LOCATION/bin/lcg-ManageSoftware .
+  cp $LCG_LOCATION/bin/lcg-ManageVOTag .
+fi
+
+# Unpack the installation scripts
+if [ ! -f $ATLAS_INSTALL_TOOLS_PKG ] ; then
+    echo "No $ATLAS_INSTALL_TOOLS_PKG archive found"
+    exit -1
+fi
+tar xfz $ATLAS_INSTALL_TOOLS_PKG
+
+
+# Copy the installation scripts to the work directory
+cp $ATLAS_INSTALL_TOOLS/* .
+
+# Clean up
+rm -fr $ATLAS_INSTALL_TOOLS_PKG $ATLAS_INSTALL_TOOLS
+
+# Print some infos
+echo "### "`date`
+echo "### Running on "`/bin/hostname -f`
+echo "### Processor specifications:"
+grep MHz /var/log/dmesg
+cat /proc/meminfo
+echo "### System specs: "
+uname -a
+
+# Launch the lcg-ManageSoftware script
+$PWD/lcg-ManageSoftware $@
+
+exit

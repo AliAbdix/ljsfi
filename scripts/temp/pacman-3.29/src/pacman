@@ -1,0 +1,21 @@
+#!/usr/bin/env python
+#!/usr/bin/env python -W ignore::DeprecationWarning
+#
+#  Pacman creates and manages software environments.
+#
+#  See http://physics.bu.edu/~youssef/pacman/
+#
+#  Saul Youssef, Boston University
+#
+#  Copyright by Saul Youssef, 2003
+#
+import sys,os,warnings
+
+if hasattr(warnings, 'simplefilter'): warnings.simplefilter('ignore',DeprecationWarning)
+
+home = os.path.split(os.path.dirname(sys.argv[0]))[0]
+src  = os.path.join(home,'src')
+
+if not src in sys.path: sys.path.insert(0,src)
+
+import Pacman

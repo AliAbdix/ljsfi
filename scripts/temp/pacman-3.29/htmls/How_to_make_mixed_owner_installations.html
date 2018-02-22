@@ -1,0 +1,29 @@
+<title>How to make mixed owner installations</title>
+<body background="sky.gif">
+<p>
+<h1><font color=navy>How to make mixed owner installations</font></h1>
+<p>
+<hr size=5>
+<p>
+    Although in the unix tradition, software is usually installed as <i>root</i>, this is often very
+undersirable, particularly for grid or distributed computing situations.  On the other hand, software
+occasionally really does have to be installed as root.  If you have a large software environment that
+has a small root requiring part, there are a couple of mechanisms in Pacman that are meant to help with
+this:
+<ul>
+<li> You can use <b>cu</b> to change username only during the parts of the installation where this is
+really necessary.  You can, for example, do 
+<pre><b><font color="#8B0000">cu('root'); package('RootRequiringPackage'); cu()
+</font></pre></b>
+to "change username" just for the installation of <b>RootRequiringPackage</b>.  The advantage of this
+is that updates of the overall environment can be performed by a non-root user unless the root
+requiring package itself changes.
+<p>
+<li> You can ask your system administrator to make a Pacman installation containing the root requiring
+packages and then use this installation as a cache.
+</ul>
+<p>
+<hr size=5>
+<h3><a href="http://physics.bu.edu/pacman/" target="_blank">Pacman Headquarters</a></h3>
+<p>
+</body>

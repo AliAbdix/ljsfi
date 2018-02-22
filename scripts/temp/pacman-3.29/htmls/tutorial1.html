@@ -1,0 +1,154 @@
+<title>Advanced updating and cache redistribution</title>
+<body background="sky.gif">
+<p>
+<h1><font color=navy>Advanced updating and cache redistribution</font></h1>
+<p>
+<hr size=5>
+<p>
+New features in Pacman 3 gives you options for backing up cahces, redistributing caches and controlling 
+how and when updates appear at remote sites.  This tutorial gets you started with a few simple examples.
+<p>
+<h2><font color=navy>Scenario</font></h2>
+<p>
+For the purpose of this tutorial, let's pretend that you are part of a project that is interested
+in using software from the <b>Demo</b> cache.  The simplest possibility is to just use the
+<b>Demo</b> cache directly as in the examples in the users guide.  However, suppose that
+<ul>
+<li> <b>Demo</b> is under control of software developers who change the content of the cache fairly
+often.  You would like to use this software, but you don't want updates to appear at your various
+installations every time something changes in <b>Demo</b>.  <i>You</i> want to be able to decide when these changes occur.
+<li> You want backups of the <b>Demo</b> cache in case of emergencies.
+<li> If a problem appears in the <b>Demo</b> cache, you want to be able to fix it quickly if it is urgent but then go back to the
+standard <b>Demo</b> contents over time and you want to do all this without causing major disruptions or changes in procedures at
+your remote installations.
+</ul>
+This is easy to do with Pacman 3.  Let's see how.
+<p>
+To start, make two working directories <b>work</b> and <b>cache</b> working directory and make a file called 
+<b>cache/myDemo.caches</b> containing
+<pre><b><font color="#8B0000">#
+# - Sample cache showing how to re-distribute Demo
+#
+Demo
+</font></pre></b>
+By making a file called <b>myDemo.Caches</b>, you have created a cache which is at least accessible
+via your local file system.  To see this, cd into <b>work</b> and do
+<pre><b><font color="#8B0000">% pacman -lc ../cache/myDemo.caches
+</font></pre></b>
+and you'll see the contents of the cache displayed.  For the purposes of this example, that's enough, but in a real
+situation you would probably want to put this file in a web visible directory and access it by something like
+<b>% pacman -lc http://yourmachine/~yourname/work/myDemo.caches</b>.
+Depending on the situation, you might alternatively want to address the cache via <b>gsiftp://...</b> or via SSH in the
+standard file location syntax.
+<p>
+So far, you haven't done much.  If your users install something through <b>myDemo.caches</b> by doing, for example,
+<pre><b><font color="#8B0000">% pacman -get ../cache/myDemo.caches:Choice
+% pacman -d up -l
+[*] Choice, update from [../cache/myDemo.caches]
+</font></pre></b>
+they will get the same content as in the
+<b>Demo</b> cache at Boston University.  An update will appear at their installations whenever <b>Choice.pacman</b> in the 
+<b>Demo</b> cache changes.  Now, however, do
+<pre><b><font color="#8B0000">% pacman -snap Demo
+% mv *.snap ../cache/Demo1.snap
+% pacman -lc ../cache/Demo1.snap
+</font></pre></b>
+and add a line to <b>myDemo.caches</b> so it contains
+<pre><b><font color="#8B0000">#
+# - Sample cache showing how to re-distribute Demo
+#
+../cache/Demo1.snap
+Demo
+</font></pre></b>
+Now open another shell where you pretend to be a user of your cache.  In a new working directory <b>work2</b>, browse your cache
+and install the <b>Choice</b> package like so
+<pre><b><font color="#8B0000">% pacman -lc ../cache/myDemo.caches
+% pacman -remove
+% pacman -get ../cache/myDemo.caches:Choice
+% pacman -d in up -l
+</font></pre></b>
+The <b>-d in up</b> displays the update cache as well as the cache that the package is in (your installation, in this case).  You
+should see that <b>Choice</b> is updated from <b>myDemo.caches</b> rather than directly from <b>Demo</b>.   You have already
+achieved two of the goals of the tutorial:
+<ol>
+<li> You have a self contained, machine independent backup of <b>Demo</b>.
+<li> Your installers will not see update appear at their installations until changes appear in new snapshots as you make new
+snapshots.
+</ol>
+Do this a couple of more times, making <b>Demo2.snap</b>, <b>Demo3.snap</b> as shown in the following figure.
+<p>
+<img src="fig1.gif" height=500 width=700>
+<p>
+This technique works recursively, so that other cache lists can point to <b>myDemo.caches</b>, etc.  Your users can always browse
+the entire contents of your cache.  If they desire, they can also install from a specific snapshot or from <b>Demo</b>.  They can
+do this either directly or via
+<pre><b><font color="#8B0000">% pacman -remove
+% pacman -get ../cache/myDemo.caches:Demo1.snap:Choice
+% pacman -remove
+% pacman -fetch ../work/myDemo.caches:Demo:Choice
+% pacman -remove
+% pacman -fetch Demo:Choice
+</font></pre></b>
+and so on.
+<p>
+You can also hide this entire apparatus inside a single package.  To illustrate this, make a directory <b>../cache</b> and put a
+file in it <b>myChoice.pacman</b> containing
+<pre><b><font color="#8B0000"># 
+#  -- A Pacman package hiding the whole updating and re-distribution mechanism of this tutorial
+#
+package('../cache/myDemo.caches:Choice')
+message('Installed!')
+</font></pre></b>
+Now, anyone who has read access can do 
+<pre><b><font color="#8B0000">% pacman -remove
+% pacman -get ../cache:myChoice
+</font></pre></b>
+as usual.  Although the details are hidden, you are providing software from <b>Demo</b> in standard Pacman fashion while still
+controlling if and when updates appear for your users.
+<p>
+<h3><font color=navy>Handling an emergency fix</font></h3>
+<p>
+Let's now suppose that you have many users who have installed <b>Choice</b> via your cache.  You suddenly have a need to change
+this package, but you want to do this in a way that doesn't disrupt the remote installations and doesn't interfere with the owners
+of <b>Demo</b>.  Do to this, make an <b>../emergency</b> area, cd to it and do
+<pre><b><font color="#8B0000">% pacman -extract-sources Demo
+% pacman -remove-all
+</font></pre></b>
+to extract the Pacman source code from <b>Demo</b> (and remove the installation debris).  You can now edit, say <b>Choice.pacman</b>, and add to <b>myDemo.caches</b>
+<pre><b><font color="#8B0000">#
+# - Sample cache showing how to re-distribute Demo
+#
+../emergency/
+../cache/Demo4.snap
+../cache/Demo3.snap
+../cache/Demo2.snap
+Demo
+</font></pre></b>
+Once you edit this file, your users with remote installations will see an update for <b>Choice.pacman</b> appear when they do
+<pre><b><font color="#8B0000">% pacman -update-check
+</font></pre></b>
+as usual.  You can update this way and go back to re-use the contents of <b>Demo</b> once they have fixed the problem as usual by
+making a snapshot and changing <b>myDemo.cache</b> to
+<pre><b><font color="#8B0000">#
+# - Sample cache showing how to re-distribute Demo
+#
+../cache/Demo5.snap
+../emergency/
+../cache/Demo4.snap
+../cache/Demo3.snap
+../cache/Demo2.snap
+Demo
+</font></pre></b>
+From the point of view of your users, nothing has happened other than a sequence identical update operations.
+<p>
+Pacman 2 provided a mechanism for delegating installation and configuration to trusted experts who control Pacman caches.  
+<ul>
+<li> <i><b>With Pacman 3, you also are able to delegate updating decisions to trusted experts.</b></i>
+</ul>
+These mechanisms allow a large base of software coming from many sources to be smoothly managed in a convenient hierarchy which
+does not complicate the situation from the point of view of an installing user.
+<p>
+<hr size=5>
+<h3><a href="http://physics.bu.edu/pacman/" target="_blank">Pacman Headquarters</a></h3>
+<p>
+</body>

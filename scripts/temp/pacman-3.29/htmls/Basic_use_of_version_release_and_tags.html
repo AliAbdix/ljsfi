@@ -1,0 +1,49 @@
+<title>Basic use of version, releases and tags</title>
+<body background="sky.gif">
+<p>
+<h1><font color=navy>Basic use of version, releases and tags</font></h1>
+<p>
+<hr size=5>
+<p>
+We have installed some software, but, so far, there has been no mention of
+software "versions."  In Pacman, the concepts of "versions," "releases numbers,"
+"tags" etc. are special cases of a general way of specifying package
+requirements.  In Pacman, you can specify packages with an optional
+expression of requirments in the form of 
+<pre><b><font color="#8B0000">% pacman -get "{package specification} | {requirements}"
+</font></pre></b>
+where <b>{requirements}</b> is just any expression in the same language used to
+desribe Pacman environments.  The double quotes in the command line are (unfortunately) required so that the
+vertical bar is not interpreted as a pipe.  This is discussed further in the documentation, but for now, let's do a
+few typical example uses.
+<p>
+  Suppose that we are interested in installing a version of
+Python greater than version 2.2.  You can start like this
+<pre><b><font color="#8B0000">% pacman -d version -lc BU
+</font></pre></b>
+to display all the packages in the cache BU showing the version numbers if any.  Having founded a version of Python
+that you like, you might want to do 
+<pre><b><font color="#8B0000">% pacman -d src -l "BU:Python | versionGE('2.2')"
+</font></pre></b>
+to browse the source code of a Python package that satisfies your requirements.  You can then do 
+<pre><b><font color="#8B0000">% pacman -get  "BU:Python | versionGE('2.2')"
+</font></pre></b>
+to install the same package.  To "get" exactly version 2.3.3 of Python, do 
+<pre><b><font color="#8B0000">% pacman -get  "BU:Python | version('2.3.3')"
+</font></pre></b>
+To get some version of Python between 2.1 and less than 2.3, do 
+<pre><b><font color="#8B0000">% pacman -get  "BU:Python | versionGE('2.1'); versionLT('2.3')"
+</font></pre></b>
+<p>
+These "version" numbers actually have no intrinsic meaning to Pacman.  They are just character strings with lexical
+ordering.  Authors of Pacman packages can add version strings, and/or "release" strings and/or "tag" strings to any
+of their packages as they like. A typical use of "tag", for example, is to distinguish debug versions of packages. 
+One might, then use something like
+<pre><b><font color="#8B0000">% pacman -get  "BU:Foo | version('1.0'); tag('debug')"
+</font></pre></b>
+to specify which "tag" you want.
+<p>
+<hr size=5>
+<h3><a href="http://physics.bu.edu/pacman/" target="_blank">Pacman Headquarters</a></h3>
+<p>
+</body>

@@ -1,0 +1,90 @@
+<title>Packages</title>
+<body background="sky.gif">
+
+<h1><font color=navy>Packages etc.</font></h1>
+<hr size=5>
+<dl>
+<dt><font color=navy>package <i>(PACKAGE)</i>, configure <i>(PACKAGE)</i></font></dt>
+<dd>package <i>(PACKAGE)</i> causes a Pacman package to be installed starting at the current working directory.  The argument 
+<i>PACKAGE</i> can be any Pacman <a href="The_full_package_specification_syntax.html">package specification</a> such as
+<pre><b><font color="#8B0000">package('BU:Python | versionGE(2.2)')
+</font></pre></b>
+The configure atom has the same syntax and differs from package only in inducing the correct behavior when Pacman uninstalls and
+updates packages.  The rule that you should follow is this:
+<p>
+<ul>
+<li> <i><b>Always use configure if you are modifying the contents of another package.</b></i>
+<li> <i><b>Use configure('FOO..') if you want your package to be re-installed whenever FOO is reinstalled.</b></i>
+</ul>
+<p>
+The practical effect of using configure is that packages become linked together in terms of what must be uninstalled and
+re-installed together.
+<p>
+<dt><font color=navy>packageName <i>(packageName)</i></font></dt>
+<dd>packageName sets the name of a Pacman package to <i>packageName</i>.  For example, if you have a package <b>FOO.pacman</b> with
+no <b>packageName</b> in the source code, the package name is taken to be "FOO".  If, on the other hand, you have several versions
+of FOO in <b>FOO-1.0.pacman, FOO-1.1.pacman, FOO-1.2.pacman</b>, you should use <b>packageName('FOO')</b> in each of these files so
+that all three packages have the name "FOO".</dd>
+<p>
+<dt><font color=navy>setup <i>(command)</i></font></dt>
+<dd>Setup let's you put code directly into the <b>setup.csh(sh)</b> scripts that Pacman generates when
+you use <b>-setup</b> or <b>-get</b>.  <b>command</b> is put directly into the scripts with the
+following modifications
+<ul>
+<li> Any string <b>SHELL</b> is replaced by "csh" and "sh" in setup.csh and setup.sh repectively.
+<li> Any string <b>source</b> is replaced by ". " in setup.sh.
+<li> Environment variables are evaluated.
+</ul>
+A typical use is
+<pre><b><font color="#8B0000">setup('source $MYPACKAGE_LOCATION/mySetup.SHELL')
+</font></pre></b>
+which causes <b>mySetup.csh</b> and <b>mySetup.sh</b> to be sourced from the standard Pacman generated
+setup scripts.
+</dd>
+<p>
+</dd>
+<dt><font color=navy>description <i>(text)</i></font></dt>
+<dd>description lets you attach a description string to a package.  This string is used for browsing and web displays.</dd>
+<p>
+<dt><font color=navy>url <i>(URL)</i>, author <i>(authorString)</i>, contact <i>(contactString)</i></font></dt>
+<dd>url, author and contact let you provide useful information about a package which is then used in browsing and web displays.</dd>
+<p>
+<dt><font color=navy>register <i>(symbolicCacheName,cacheURL,infoString,infoURL,contactString,contactEmail)</i></font></dt>
+<dd>register let's you define your own symbolic cache names.  This is typically useful for large project who want to define a common
+set of caches with convenient names.  For example,
+<pre><b><font color="#8B0000">register('BU','http://atlas.bu.edu/caches','Atlas Tier 2, Boston University','http://physics.bu.edu/~usatlas/','Saul Youssef', 'http://physics.bu.edu/~youssef/')
+</font></pre></b>
+defines the symbolic cache name <b>BU</b>, so that one can refer to <b>BU:Python</b>, for example.
+<p>
+<dt><font color=navy>restore <i>(filename)</i></font></dt>
+<dd><b>restore</b> restores a file or directory tree that has been saved from when a package was last uninstalled.  <b>restore</b> is often useful as a way of saving
+configuration information that is meant to be saved even after a package is uninstalled or across package updates.  Suppose, for example, that you wanted to add 
+a file <b>foo.html</b> to the <b>dist/</b> area of the package <b>BU:PythonDocs</b> package (for some reason).  You want <b>foo.html</b> to be edited over time 
+by hand and restored in place each time <b>PythonDocs</b> is updated.  You can do this by making a package called, for example, <b>PythonDocsConfig</b> containing:
+<pre><b><font color="#8B0000">configure('BU:PythonDocs')
+cd('$PYTHONDOC_ROOT')
+cd('dist')
+restore('foo.html')
+cd(); cd()
+</font></pre></b>
+this causes the <b>foo.html</b> to be saved to a private area whenever <b>PythonDocsConfig</b> is uninstalled.  Because PythonDocsConfig configures PythonDocs, 
+it will be reinstalled whenever PythonDocs itself is reinstalled.  This means that changes made in the <b>dist/foo.html</b> file while the package is 
+installed will be saved and restored each time Python is re-installed. You can use the command line switches <b>-v restore</b> and <b>-ask restore</b> 
+to watch this happening.  This might typically be used for user touched configuration files.
+<p>
+Note that this is not a particularly good way to save configuration information even if the configuration is modified
+by hand, however, this is useful to use when you are dealing with existing packages already work this way.  Also, note
+that the saved files are always removed when a package is removed.  An installation with all packages removed also has
+no saved files.
+</dd>
+<p>
+<dt><font color=navy>alreadyInstalled <i>(PACKAGE)</i></font></dt>
+<dd>alreadyInstalled lets you require that a package <i>PACKAGE</i> must be already installed in the local
+installation before the current package can be installed.  
+</dd>
+</dd>
+</dl>
+<hr size=5>
+<h3><a href="http://physics.bu.edu/pacman/" target="_blank">Pacman Headquarters</a></h3>
+<p>
+</body>

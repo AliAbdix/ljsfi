@@ -1,0 +1,41 @@
+#!/bin/sh
+########################################################
+# Alessandro De Salvo <Alessandro.DeSalvo@roma1.infn.it>
+# LJSFi 1.1.x suite
+# 16 Oct 2006
+#
+# Create the host list
+#
+
+#Check the proxy status
+$BINPATH/check-proxy
+rc=$?
+[ $rc -ne 0 ] && exit $rc
+
+HSTLIST=host.list
+
+rm -fr $HSTLIST
+echo
+echo ">> Saving host list in $HSTLIST"
+echo
+
+TMPJDL=tmp.$$.jdl
+TMPLST=tmp.list.$$.jdl
+rm -f ${TMPJDL} ${TMPLST}
+
+cat > $TMPJDL <<EOD
+Executable = "/bin/hostname";
+OutputSandbox = {"stdout","stderr"};
+stdoutput = "stdout";
+stderror = "stderr";
+VirtualOrganisation = "atlas";
+Requirements = (other.GlueCEPolicyMaxCPUTime >= 300);
+EOD
+
+$LJSF_JOBLISTMATCH $TMPJDL | grep jobmanager | awk '{print $1}' \
+                           | awk -F ':' '{print $2" "$1}' | uniq -f 1 > $TMPLST
+cat $TMPLST | awk '{print $2":"$1}' > $HSTLIST
+
+rm -f ${TMPJDL} ${TMPLST}
+
+exit

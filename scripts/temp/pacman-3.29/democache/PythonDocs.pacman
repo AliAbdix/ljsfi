@@ -1,0 +1,9 @@
+#
+#	Python Documentation
+#
+packageName('PythonDocs')
+description('Python Documentation','http://www.python.org/doc/')
+version('2.3.3')
+
+downloadUntarzip('http://www.python.org/ftp/python/doc/2.3.3/html-2.3.3.tgz')
+

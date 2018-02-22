@@ -1,0 +1,143 @@
+#!/bin/sh
+##########################################################
+#           ATLAS ReleaseRestart LJSFi module            #
+# Alessandro De Salvo <Alessandro.DeSalvo@roma1.infn.it> #
+##########################################################
+
+help()
+{
+  echo "HELP"
+  echo "`basename $0`: restart the deployment of a release"
+  echo "Usage: `basename $0` [OPTIONS] <release name>"
+  echo "       OPTIONS:"
+  echo "            -a|--all                Restart all requests,"
+  echo "                                    don't check for available resources."
+  echo "            -c|--ce                 Filter on the CE name"
+  echo "            -d|--debug              Output debug messages."
+  echo "            -e|--exclude <file>     Exclude sites from <file>"
+  echo "                                    (default: $EXCLUDELIST)."
+  echo "            -h|--help               Display this help."
+  echo "            -m|--max-failures <n>   Max allowed failures."
+  echo "            -r|--req-status         Filter on the request status"
+  echo "            -s|--status             Filter on the job status"
+  echo "            -S|--sitename           Filter on the site name"
+  echo "            -t|--trial              Perform a trial run, no submission."
+  echo "            -T|--task <name>        Restart task <name>."
+  exit 0
+}
+
+
+# Get the command line options
+EXCLUDELIST="${CONFPATH}/autorequest.exclude"
+MAXFAILURES=0
+TRIAL="no"
+CEREQ=""
+REQSTATUS="stopped"
+TASK="validation"
+OPTS=`getopt -o ac:de:hm:r:s:S:tT: -l all,ce:,debug,exclude:,help,max-failures:,req-status:,sitename:,status:,task:,trial -- "$@"`
+if [ $? != 0 ] ; then echo "Terminating..."; exit -1 ; fi
+eval set -- "$OPTS"
+while true ; do
+        case "$1" in
+                -h|--help)         help; shift;;
+                -a|--all)          ALLREQ="yes"; shift;;
+                -c|--ce)           CEREQ="--cename=$2"; shift 2;;
+                -d|--debug)        DEBUG="yes"; shift;;
+                -e|--exclude)      EXCLUDELIST="$2"; shift 2;;
+                -m|--max-failures) MAXFAILURES="$2"; shift 2;;
+                -r|--req-status)   REQSTATUS="$2"; shift 2;;
+                -s|--status)       FILTER="`echo $2 | tr a-z A-Z`"; shift 2;;
+                -S|--sitename)     SITEREQ="$2"; shift 2;;
+                -t|--trial)        TRIAL="yes"; shift;;
+                -T|--task)         TASK="$2"; shift 2;;
+                --)                shift ; break ;;
+                \?)                break ;
+                exit ;;
+        esac
+done
+[ "$FILTER" != "" ] && ALLREQ="no"
+
+
+# Check the DB status
+$BINPATH/dbcheck
+rc=$?
+[ $rc -ne 0 ] && exit $rc
+
+# Check the proxy status
+$BINPATH/check-proxy
+[ $rc -ne 0 ] && exit $rc
+
+# Create the final exclude list
+EXCLLST=/tmp/ljsf.exclude.list.tmp.$$
+[ -s $EXCLUDELIST ] && cp $EXCLUDELIST $EXCLLST
+#ljsfinfo.py --select='distinct(site.cename)' --site-disabled --quiet | sed 's/"//g' >> $EXCLLST
+ljsfinfo.py --list-ce --site-disabled --quiet | sed 's/"//g' >> $EXCLLST
+if [ "$DEBUG" == "yes" ] ; then
+    echo "==================="
+    echo "Using exclude list:"
+    echo "==================="
+    cat $EXCLLST
+    echo "==================="     
+fi
+
+RELEASE=${1}
+if [ "$RELEASE" == "" ] ; then
+    help
+    exit 1
+fi
+TMPCELIST="/tmp/ljsfi.celist.$$.tmp"
+if [ "$ALLREQ" != "yes" ] ; then
+    [ "$DEBUG" != "" ] && echo "Getting the list of the $VO CE resources using lcg-info"
+    lcg-info --vo $VO --list-ce | grep 'CE:' | cut -d':' -f 2- | sed 's/^ *//g' > $TMPCELIST
+    echo "`cat $TMPCELIST | wc -l` CE resources available for the VO $VO"
+fi
+echo "Restarting all the $TASK tasks of release $RELEASE"
+TMPRESTART="/tmp/ljsfi.rr.$$.tmp"
+[ ! -f ${EXCLLST} ] && touch ${EXCLLST}
+ljsfreq.py --query --rel=$RELEASE --status=$REQSTATUS --reqtype=$TASK $CEREQ | cut -d ',' -f 1,4,6 | grep -v -f ${EXCLLST} > $TMPRESTART
+rm -f ${EXCLLST}
+TOTJOBS="`cat $TMPRESTART | wc -l`"
+
+cat $TMPRESTART | while read i; do
+    [ "$COUNT" == "" ] && let COUNT=0
+    let COUNT=$COUNT+1
+    RESTART="yes"
+    JOBREQ="`echo $i | cut -d',' -f 1`"
+    RELNAME="`echo $i | cut -d',' -f 2`"
+    JOBRES="`echo $i | cut -d',' -f 3`"
+    CENAME="`echo $JOBRES | cut -d':' -f 1`"
+    if [ "$ALLREQ" != "yes" ] ; then
+        JOBSTATUS="`ljsfbkk.py --select=job.status --request=$JOBREQ --last=1 --quiet | cut -d',' -f 2 | sed 's/^ *//;s/ *$//' | tr a-z A-Z`"
+        [ "$FILTER" != "" -a "$JOBSTATUS" != "$FILTER" ] && RESTART="no"
+        grep \^${JOBRES}\$ $TMPCELIST &> /dev/null
+        [ $? -ne 0 ] && RESTART="no"
+        [ "$DEBUG" != "" -a "$RESTART" == "no" ] && echo "Filtering out $CENAME for release $RELNAME"
+    fi
+    if [ "$RESTART" == "yes" ] ; then
+        SITENAME="`get-site-info $CENAME | grep ^GlueSiteName | awk '{print $2}'`"
+        [ "$SITENAME" == "" ] && RESTART="no"
+        [ "$SITEREQ" != "" -a "$SITEREQ" != "$SITENAME" ] && RESTART="no"
+        [ "$DEBUG" != "" ] && echo "$CENAME belongs to site name $SITENAME"
+    fi
+    if [ "$RESTART" == "yes" -a $MAXFAILURES -gt 0 ] ; then
+        FAILURES="`ljsfbkk.py --select=job.exit_code --dest=$CENAME --last=$((MAXFAILURES+1)) --quiet --rel=$RELNAME | grep -v ^0 | wc -l`"
+        if [ $FAILURES -gt $MAXFAILURES ] ; then
+            echo "Too many failures ($FAILURES) for release $RELNAME in $CENAME"
+            RESTART="no"
+        else
+            [ "$DEBUG" != "" ] && echo "Number of failures for release $RELNAME in $CENAME: $FAILURES [OK]"
+        fi
+    fi
+    if [ "$RESTART" == "yes" ] ; then
+        [ "$SITENAME" != "" ] && SITENAME_OPT=" --sitename=${SITENAME}" || SITENAME_OPT=""
+        [ "$DEBUG" != "" ] && echo "Restarting release $RELEASE in $JOBRES ([${COUNT}/${TOTJOBS}] $(((100*COUNT)/TOTJOBS))% done)"
+        if [ "$TRIAL" == "yes" ] ; then
+            echo ljsfreq.py --update --status=autorun --reqid=$JOBREQ $SITENAME_OPT
+        else
+            ljsfreq.py --update --status=autorun --reqid=$JOBREQ  $SITENAME_OPT &> /dev/null
+        fi
+    fi
+done
+[ -f "$TMPCELIST" ]  && rm -f $TMPCELIST
+[ -f "$TMPRESTART" ] && rm -f $TMPRESTART
+exit

@@ -1,0 +1,31 @@
+#!/bin/sh
+SITE=$1
+
+if [ -z "$SITE" ] ; then
+    echo "Usage: `basename $0` <sitename>"
+    exit 1
+fi
+
+TMPFILE=/tmp/retag-agis.$$
+ljsfinfo.py --select=release_data.name,cename --sitename=$SITE --quiet \
+            --status=installed | sed 's/"//g' > $TMPFILE
+TAGS="`cat $TMPFILE | wc -l`"
+[ -z "$TAGS" ] && TAGS=0
+echo "$TAGS tags found"
+INDX=0
+CHECKPOINT=20
+T0="`date +%s`"
+cat $TMPFILE | while read line; do
+    REL="`echo $line | cut -d, -f 1`"
+    CE="`echo $line | cut -d, -f 2`"
+    agis-tags --add --ce $CE --rel $REL
+    INDX=$((INDX+1))
+    if [ $((INDX % CHECKPOINT)) -eq 0 ] ; then
+        T1="`date +%s`"
+        TAVG=$(((T1-T0)/INDX))
+        TLEFT=$(((TAGS-INDX)*TAVG))
+        echo "$((100*INDX/TAGS))% done [ETA: ${TLEFT}s"
+    fi
+done
+rm -f $TMPFILE
+exit

@@ -1,0 +1,5 @@
+#!/bin/sh
+status $JOBSPATH/* | grep "Done" | awk '{print $1}' | \
+while read d; do
+    [ -z "`ls -d $OUTPUTPATH/${d}* 2>/dev/null`" ] && rm -f $JOBSPATH/${d}.job
+done

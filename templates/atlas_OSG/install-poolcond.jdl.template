@@ -1,0 +1,8 @@
+Executable = "sw-mgr";
+InputSandbox = {"@SCRIPTPATH@/sw-mgr","@SCRIPTPATH@/getFrontierEnv.py"};
+OutputSandbox = {"stdout", "stderr", "install.xml"};
+stdoutput = "stdout";
+stderror = "stderr";
+Arguments = "-i @RELNAME@ -p @OSGPHYSICALPATH@ --ddm-setup $OSG_APP/atlas_app/atlas_rel/ddm/latest/setup.sh --poolcond-pattern @SWNAME@ --host @TAGHOST@ --grid-name @GRIDNAME@ --vo atlas --require-shfs -T poolcond --xml install.xml --site-config $OSG_APP/atlas_app/atlas_rel/AtlasSiteConfig.sh --local-config $OSG_APP/atlas_app/atlas_rel/local";
+VirtualOrganisation = "atlas";
+Requirements = other.GlueCEUniqueId=="@SITE_CS@";

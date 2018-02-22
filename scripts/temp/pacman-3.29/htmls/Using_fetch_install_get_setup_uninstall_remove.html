@@ -1,0 +1,59 @@
+<title>Using -fetch, -install, -get, -setup, -uninstall and -remove</title>
+<body background="sky.gif">
+<p>
+<h1><font color=navy>Using -fetch, -install, -setup, -get, -uninstall and -remove</font></h1>
+<p>
+<hr size=5>
+<p>
+The most basic operations of "getting" and removing packages is often all you need to know about Pacman
+to get software that you are interested in.  Sometimes, however, it helps to have finer controls over
+these operations.  This is provided by
+<ul>
+<li> <b>-fetch</b>.  This fetches Pacman information from remote caches and resolves any dependencies and
+evaluates whether the packages can be installed on your system.  The advantage of first doing
+<b>-fetch</b> is that if there are several problems preventing a complicated installation, you can see
+all of the problems before having to repeatedly attempt to do the installation.
+<li> <b>-install</b>.  The <b>-install</b> switch has the same effect as <b>-fetch</b> but then also attempts to install
+the packages that you have indicated on the command line.  If the installation fails, the reasons for the failure will be
+displayed on the command line. 
+<li> <b>-setup</b>.  The <b>-setup</b> switch produces a combined environment using all of the software in your installation.  If
+this is consistent, it produces scripts <b>setup.csh</b>, <b>setup.sh</b> and <b>setup.py</b> which set up a user to use all of
+the software installed in the installation.
+</ul>
+Let's try this now.  For example, make a new work area and try
+<pre><b><font color="#8B0000">% pacman -fetch BU:nEdit Pacman:Pacman
+% pacman -l
+[ ] nEdit, in cache [/home/youssef/Pacman/work]
+[ ] Pacman, in cache [/home/youssef/Pacman/work]
+</font></pre></b>
+this tells you that all dependencies have been resolved and that you may be able to do the installation.  To install the packages,
+you can do <font color="#8B0000"><b>% pacman -install BU:nEdit Pacman:Pacman</b></font> or simply
+<pre><b><font color="#8B0000">% pacman -install
+</font></pre></b>
+to install all of the top level packages in the installation.  You will then see
+<pre><b><font color="#8B0000">% pacman -l
+[*] nEdit, in cache [/home/youssef/Pacman/work]
+[*] Pacman, in cache [/home/youssef/Pacman/work]
+</font></pre></b>
+that the installation has worked but no setup scripts have appeared.  Finally, do 
+<pre><b><font color="#8B0000">% pacman -setup
+</font></pre></b>
+and you will see that the setup scripts appear.  To avoid confusion, <b>-setup</b> always applies to an entire installation, so if you see setup scripts, it
+automatically means that Pacman has concluded that all of the software in the installation has successfully installed and that the packages are consistent.  
+<p>
+Part of the point of separating <b>-setup</b> is to allow installations that contain inconsistent packages.  This is useful, for example, if you want to have
+a single installation that contains multiple incompatible versions of the same package.  See the versions section for of the documentation for more details
+about this.
+<p>
+<ul>
+<li> <b>-get</b> is the same as <b>-fetch</b> followed by <b>-install</b> and <b>-setup</b>.
+<li> <b>-uninstall</b> lets you uninstall individual packages without removing them from the local installation.  
+<li> <b>-remove</b> lets you remove the indicated list of packages from an installation entirely.
+<li> <b>-remove-all</b> lets you remove all packages in an installation.
+</ul>
+For practice, try <b>-uninstall</b> on various package in your installation and then do <b>% pacman -install</b> or <b>% pacman -get</b> to re-install.
+<p>
+<hr size=5>
+<h3><a href="http://physics.bu.edu/pacman/" target="_blank">Pacman Headquarters</a></h3>
+<p>
+</body>

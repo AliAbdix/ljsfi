@@ -1,0 +1,9 @@
+Executable = "gbb";
+InputSandbox = {"SCRIPTPATH/sw-mgr","SCRIPTPATH/gbb","SCRIPTPATH/lcg-tags"};
+OutputSandbox = {"stdout", "stderr", "install.xml"};
+stdoutput = "stdout";
+stderror = "stderr";
+Arguments = "--timing -v -m 300 -p -D 600 -s GBB_SURL sw-mgr -i RELNAME --validate -l LOGPATH/RELNAME -p PHYSPATH/VERSIONAREA -o --host CENAME --subcluster SCNAME --grid-name GRIDNAME --force-tags --add-tags --tags RELTAG -P SWNAME -T RELCATEGORY -t ARCH -O opt --require-prj REQPRJ -m PACMANVERSION --xml install.xml KV_POST_OPT KITCACHE";
+Environment = {"LCG_CATALOG_TYPE=LCGCATALOGTYPE","LFC_HOST=LFCHOST"};
+VirtualOrganisation = "atlas";
+Requirements = other.GlueCEUniqueId=="CEID";

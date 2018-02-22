@@ -1,0 +1,25 @@
+<title>How to access  caches via SSH and/or Globus</title>
+<body background="sky.gif">
+<p>
+<h1><font color=navy>How to access caches via SSH and/or Globus</font></h1>
+<p>
+<hr size=5>
+<p>
+    If you want to restrict who can install your packages, one way to do this in Pacman is to put
+caches on machines which have to be accessed via ssh.  You then just use the standard SSH addressing of
+a directory on your machine to specify cache locations as in
+<pre><b><font color="#8B0000">% pacman -get youssef@atlas.bu.edu:/atlasgrid/caches:Python
+</font></pre></b>
+or
+<pre><b><font color="#8B0000">% pacman -get gsiftp://atlas.bu.edu/atlasgrid/caches:Python
+</font></pre></b>
+Of course, if you don't have your SSH and/or grid certificate set up in the usual way, you will get an
+error message.
+<p>
+    These kinds of caches are a convenient way of providing increased security and/or restricted 
+access in situations, for example, where licenses are involved.
+<p>
+<hr size=5>
+<h3><a href="http://physics.bu.edu/pacman/" target="_blank">Pacman Headquarters</a></h3>
+<p>
+</body>

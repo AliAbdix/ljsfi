@@ -1,0 +1,46 @@
+#!/bin/sh
+#################################
+# Get the partial output of a job
+# A. De Salvo - 2009
+# LJSFi framework v1
+
+source $BINPATH/status.def
+source $CONFPATH/install.conf
+
+#Check the DB status
+$BINPATH/dbcheck
+rc=$?
+[ $rc -ne 0 ] && exit $rc
+
+#Check the proxy status
+$BINPATH/check-proxy
+
+TMPDIR=$PWD/tmp.gpo.$$
+JOB=${1}
+NUM=${2}
+shift 2
+[ "$NUM" == "" ] && NUM=1
+JOBNAME="`basename $JOB | sed 's/.job//g'`"
+JOBID="`cat $JOB 2>/dev/null | grep "^[ -]*https" | sed 's/^ - //g' | awk '{print $1}'`"
+if [ "$JOBID" != "" ] ; then
+  STATUS="`getStatus $JOBID | cut -d '|' -f 1 | sed 's/ $//g'`"
+  if [ "$STATUS" == "Running" ] ; then
+    gbbc -s $GBB_SURL -r $JOBID
+    if [ $? -eq 0 ] ; then
+      printf "Partial stats dumping requested. Please try again later.\n"
+    elif [ $? -eq 1 ] ; then
+      printf "Getting partial stats of %s\n" "$JOBNAME"
+      gbbc -t $NUM -v -S -s $GBB_SURL $JOBID
+      if [ $? -ne 0 ] ; then
+          printf "Cannot get the partial stats.\n"
+      fi
+    else
+      printf "Unable to request partial stats dumping.\n"
+    fi
+  else
+    echo "Status of job $JOBNAME is \"$STATUS\". Skipping."
+  fi
+fi
+rm -fr $TMPDIR
+
+exit

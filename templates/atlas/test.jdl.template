@@ -1,0 +1,9 @@
+Executable = "gbb";
+InputSandbox = {"@SCRIPTPATH@/test-release.sh","@SCRIPTPATH@/gbb"};
+OutputSandbox = {"stdout","stderr"};
+stdoutput = "stdout";
+stderror = "stderr";
+Arguments = "--timing -v -m 120 -p -D 120 -s @GBB_SURL@ -c 1 ./test-release.sh RELEASE $VO_ATLAS_SW_DIR/software/RELEASE @SWNAME@";
+Environment = {"arch=@ARCH@","relarch=@RELARCH@","platform=@PACMANPLATFORM@","PACMAN_VER=@PACMANVERSION@","LCG_CATALOG_TYPE=@LCGCATALOGTYPE@","LFC_HOST=@LFCHOST@","VERAREA=@VERSIONAREA@","@DBRELEASE@PATH=$VO_ATLAS_SW_DIR/db","ATLAS_COMPILER=ATLASCOMPILER","T_POST=KVPOST"};
+VirtualOrganisation = "atlas";
+Requirements = other.GlueCEUniqueId=="@SITE_CS@";

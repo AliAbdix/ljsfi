@@ -1,0 +1,9 @@
+#!/usr/bin/env python
+import commands,sys
+#status, output = commands.getstatusoutput("dq2-ls -f -L CERNPROD user.mlassnig.dataset.1")
+status, output = commands.getstatusoutput("dq2-ls -f user.mlassnig.dataset.1")
+print output
+if "user.mlassnig.dataset.1\n[X]\tdummyfile1\t35aeb84a-aeef-41f4-bd2f-616972f4cd69\tmd5:bf7700bd815231d79ec96613f35e175c\t52428800\n[X]\tdummyfile2\t0c752981-0432-48e6-84b4-54baa245a61a\tmd5:6b2c90fa80e7160b1ff615c606796acb\t52428800\n[X]\tdummyfile3\tb712f157-e5da-4946-983e-536a97473652\tmd5:8e46d1a0ebd2de342df654e18737f849\t52428800\n" or "user.mlassnig.dataset.1\n[]\tdummyfile1\t35aeb84a-aeef-41f4-bd2f-616972f4cd69\tmd5:bf7700bd815231d79ec96613f35e175c\t52428800\n[]\tdummyfile2\t0c752981-0432-48e6-84b4-54baa245a61a\tmd5:6b2c90fa80e7160b1ff615c606796acb\t52428800\n[]\tdummyfile3\tb712f157-e5da-4946-983e-536a97473652\tmd5:8e46d1a0ebd2de342df654e18737f849\t52428800\n" in output:
+	sys.exit(0)
+else:
+	sys.exit(1)

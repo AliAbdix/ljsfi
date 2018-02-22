@@ -1,0 +1,46 @@
+#!/bin/sh
+replicateFile ()
+{
+  MYLFN="$1"
+  MYCENAME="$2"
+  LGCMD="lcg-lg --vo atlas"
+  REPCMD="lcg-rep -v -n 10 --vo atlas"
+  shift 2
+
+  CLOSESE=`cat ${SITESOUTPUTPATH}/*${MYCENAME}*/*.txt | grep "Default SE" | tail -n 1 | cut -d: -f 2 | sed 's/ //g'`
+  if [ "$CLOSESE" != "" ] ; then
+    GUID="`$LGCMD lfn:$MYLFN 2>/dev/null`"
+    if [ "$GUID" != "" ] ; then
+      $REPCMD lfn:$MYLFN -d $CLOSESE -P install/lcg/`basename $MYLFN`
+    else
+      echo "Cannot find $MYLFN in the RLS"
+      exit -1
+    fi
+  fi
+}
+
+
+if [ "$2" = "" ] ; then
+  echo "Usage: "`basename $0`" <lfn> <Site CE FQDN|file with a list of CE FQDNs>"
+  exit -1
+fi
+
+source $CONFPATH/install.conf
+
+#Check the proxy status
+$BINPATH/check-proxy
+
+LFN="$1"
+CENAME="$2"
+
+if [ -f $CENAME ] ; then
+  cat $CENAME | grep -v "^#" | while read item ; do
+    echo "Replicating $LFN to $item"
+    replicateFile "$LFN" "$item"
+  done
+else
+  echo "Replicating $LFN to $CENAME"
+  replicateFile "$LFN" "$CENAME"
+fi
+
+exit

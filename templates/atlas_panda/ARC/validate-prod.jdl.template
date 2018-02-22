@@ -1,0 +1,12 @@
+{
+    "JobDef": {
+        "Executable": "http://atlpan.web.cern.ch/atlpan/install/sw-mgr",
+        "Arguments": "-i @RELNAME@ -l @LOGICALPATH@/@RELNAME@ -p @PHYSICALPATH@/@VERSIONAREA@ @LOGLINK@ -o --validate --grid-name @GRIDNAME@ --host @SITE_CENAME@ --site-type @INFOSYS_SITETYPE@ --require-shfs --no-tag -P @SWNAME@ -T release -t @ARCH@ -O opt -m @PACMANVERSION@ --xml install.xml --stagein http://atlpan.web.cern.ch/atlpan/install/metadata.xml --post-siteinfo --post-siteurl @LJSFSERVER@/exec/updinfo.php --site-config $VO_ATLAS_SW_DIR/AtlasSiteConfig.sh --pretend-platform SL-6 @KVPOST@ @KITCACHE@ @DBRELEASE@ @ATLASCOMPILER@ --",
+        "Site": "@SITE_CS@"
+    },
+    "ResDef": {
+        "resource_type": "@INFOSYS_SITETYPE@",
+        "lfcprodpath": "@INFOSYS_LFCPRODPATH@",
+        "seprodpath": "@INFOSYS_SEPRODPATH@"
+    }
+}

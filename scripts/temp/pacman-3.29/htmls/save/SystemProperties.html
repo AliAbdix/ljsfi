@@ -1,0 +1,84 @@
+<title>System properties</title>
+<body background="sky.gif">
+
+<h1><font color=navy>System properties</font></h1>
+<hr size=5>
+<dl>
+<dt><font color=navy>platform <i>(plat)</i>, platformLE <i>(plat)</i>, platformLT <i>(plat)</i>, platformGE <i>(plat)</i>, 
+platformGT <i>(plat)</i></font></dt>
+<dd>platform lets you make requirements on the basic system architecture. Typical examples are 
+<b><pre><font color="#8B0000">platform('linux-redhat-7.3')  # require RedHat Linux version 7.3
+#
+#- Require RedHat version 7.3-9 or any version of cygwin
+#
+{ platformGE('linux-redhat-7.3'); platformLT('linux-redhat-9') OR platformGE('cygwin') } 
+</font></pre></b>
+You can get a list of supported platforms by doing <b>% pacman -platforms</b>.
+</dd>
+<p>
+<dt><font color=navy>tcpPorts <i>(host,portStart,portEnd)</i></font></dt>
+<dd>tcpPorts lets you require internet connectivity to <i>host</i> with port range as indicated.  The test for connectivity is done
+once at installation time.</dd>
+<p>
+<dt> <font color=navy>rpm <i>(filename)</i>, rpmInstalled <i>(filename)</i></font></dt>
+<dd>rpm and rpmInstalled let you install an rpm as part of an installation procedure (rpm) or test if an rpm is already installed
+(rpmInstalled).  As with all Pacman operations, if Pacman installs an rpm for you when a package is installed, it will also remove
+it when the package is uninstalled.</dd>
+<p>
+<dt><font color=navy>heapSize <i>(bytes)</i>, stackSize <i>(bytes)</i>, imageSize <i>(bytes)</i></font></dt>
+<dd>These atoms test the maximum memory sizes on the installing system.  imageSize <i>(bytes)</i> guarantees that 
+a image with size at least <i>bytes</i> can be run.</dd>
+<p>
+<dt><font color=navy>fileSizeSoft <i>(bytes)</i>, fileSizeHard <i>(bytes)</i>, fileSize <i>(bytes)</i></font></dt>
+<dd>These atoms test maximum allowed file sizes on a system.  fileSize <i>(bytes)</i> guarantees that a file with size
+at least <i>bytes</i> can be created.</dd>
+<p>
+<dt><font color=navy>timeErrorMaximum <i>(seconds)</i></font></dt>
+<dd>timeErrorMaximum requires that the system clock on the installing system to be accurate to within
+<i>seconds</i> seconds <i>specified as a floating point number</i>.  This is typically important for distributed computing or grid applications.</dd>
+<p>
+<dt><font color=navy>downloadTime <i>(FILE,minimumSeconds)</i></font></dt>
+<dd>downloadTime is a network performance test.  
+It requires that the FILE (syntax is the same as in <i>download</i>) 
+be downloaded to the installation site within <i>minimumSeconds</i> seconds specified as a floating point
+number.</dd>
+<p>
+<dt><font color=navy>cpuSecondsSoft <i>(seconds)</i>, cpuSecondsHard <i>(seconds)</i>, cpuSeconds <i>(seconds)</i></font></dt>
+<dd>Systems sometimes have built in limits on the maximum cpu time a process can used before it is automatically killed.
+These atoms let you require that such limits are greater than <i>seconds</i> seconds.  <i>cpuSeconds</i> requires that the
+minimum of the soft and hard limits be greater than the <i>seconds</i> argument.  As usual, seconds are
+specified as a floating point number.</dd>
+<p>
+<dt><font color=navy>openFileDescriptorsSoft <i>(ndesc)</i>, openFileDescriptorsHard <i>(ndesc)</i>, openFileDescriptors
+<i>(ndesc)</i></font></dt>
+<dd>These atoms test the maximum allowed number of open file descriptors on a system.  openFileDescriptors <i>(ndesc)</i> guarantees
+that at least <i>ndesc</i> file descriptors can be open at once.</dd>
+<p>
+<dt><font color=navy>runningProcess <i>(processName)</i></font></dt>
+<dd>runningProcess requires that <i>processName</i> be a currently running process at the time of installation.</dd>
+<p>
+<dt><font color=navy>fileCopyMinimumMegsPerSecond <i>(path,minimumMegsPerSecond)</i></font></dt>
+<dd>fileCopyMinimumMegsPerSecond lets you test disk writing speed at the installation machine.  This requires that
+at least <i>minimumMegsPerSecon</i> can be copied from one file to another at location <i>path</i>.</dd>
+<p>
+<dt><font color=navy>systemWordSize <i>(wordsizestring)</i></font></dt>
+<dd>Specify "32" or "64" to determine the system word size.</dd>
+<p>
+<dt><font color=navy>byteOrder <i>(style)</i></font></dt>
+<dd>Specify the system byte order style as in "little".</dd>
+<p>
+<dt><font color=navy>processor <i>(text)</i></font></dt>
+<dd>Specify the system hardware as in "i686".</dd>
+<p>
+<dt><font color=navy>systemVersion <i>(plat)</i>, systemVersionLE <i>(plat)</i>, systemVersionLT <i>(plat)</i>, systemVersionGE <i>(plat)</i>, 
+systemVersionGT <i>(plat)</i></font></dt>
+<dd>System version string as returned by the Python platform module.</dd>
+<p>
+<dt><font color=navy>systemRelease <i>(plat)</i>, systemReleaseLE <i>(plat)</i>, systemReleaseLT <i>(plat)</i>, systemReleaseGE <i>(plat)</i>, 
+systemReleaseGT <i>(plat)</i></font></dt>
+<dd>System release string as returned by the Python platform module.</dd>
+</dl>
+<hr size=5>
+<h3><a href="http://physics.bu.edu/pacman/" target="_blank">Pacman Headquarters</a></h3>
+<p>
+</body>

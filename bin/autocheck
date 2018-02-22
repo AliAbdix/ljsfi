@@ -1,0 +1,198 @@
+#!/bin/sh
+
+########################################
+# Autocheck the releases for consistency
+# ACR module
+# A. De Salvo - 2010
+# LJSFi framework v1.2
+
+help()
+{
+  echo "HELP"
+  echo "`basename $0`: Auto check the installations of a release in the available sites"
+  echo "Usage: `basename $0` [OPTIONS]"
+  echo "       OPTIONS:"
+  echo "            -b|--base               Check base releases."
+  echo "            -c|--ce <CE FQDN>       Check <CE FQDN> only."
+  echo "            -d|--debug              Output debug messages."
+  echo "            -e|--exclude <file>     Exclude sites from <file>"
+  echo "                                    (default: $EXCLUDELIST)."
+  echo "            -g|--grid-name <name>   Select grid name or ALL (default: $GRIDNAME)."
+  echo "            -h|--help               Display this help."
+  echo "            -o|--obsolete           Check obsolete releases."
+  echo "            -P|--patch              Check patch releases."
+  echo "            -p|--production         Check production releases."
+  echo "            -s|--dsstatus <0|1>     Default site status:"
+  echo "                                    0=disabled, 1=enabled (default: $DSSTATUS)."
+  echo "            --target <tgt>          Perform requests for target <tgt>."
+  echo "            -t|--trial              Perform a trial run, no submission."
+  echo "            -T|--task               Use the specified task"
+  echo "                                    (default: $TASK)."
+  echo "            --template <tmpl>       Use the template <tmpl>."
+  exit 0
+}
+
+# Get the autorequest configuration
+[ -s "${CONFPATH}/autorequest.conf" ] && source ${CONFPATH}/autorequest.conf
+
+# Get the command line options
+EXCLUDELIST="${CONFPATH}/autocheck.exclude"
+TRIAL="no"
+MAXFAILURES=0
+TASK="test"
+[ -z "$GRIDNAME" ] && GRIDNAME="ALL"
+[ -z "$DSSTATUS" ] && DSSTATUS="1"
+OPTS=`getopt -o bc:de:hpPs:tT: -l base,ce:,debug,dsstatus:,exclude:,help,grid-name:,obsolete,patch,production,target:,template:,trial,task: -- "$@"`
+if [ $? != 0 ] ; then echo "Terminating..."; exit -1 ; fi
+eval set -- "$OPTS"
+while true ; do
+        case "$1" in
+                -h|--help)         help; shift;;
+                -c|--ce)           CE="$2"; shift 2;;
+                -b|--base)         RELFILTER="--base"; shift;;
+                -d|--debug)        DEBUG="yes"; shift;;
+                -e|--exclude)      EXCLUDELIST="$2"; shift 2;;
+                -g|--grid-name)    GRIDNAME="$2"; shift 2;;
+                -o|--obsolete)     RELOPT="--obsolete"; shift;;
+                -P|--patch)        RELFILTER="--patch"; shift;;
+                -p|--production)   RELOPT="--production"; shift;;
+                -s|--dsstatus)     DSSTATUS="$2"; shift 2;;
+                --target)          TARGET="$2"; shift 2;;
+                -t|--trial)        TRIAL="yes"; shift;;
+                -T|--task)         TASK="$2"; shift 2;;
+                --template)        TMPL="$2"; shift 2;;
+                --)                shift ; break ;;
+                \?)                break ;
+                exit ;;
+        esac
+done
+
+
+# Check the DB status
+$BINPATH/dbcheck
+rc=$?
+[ $rc -ne 0 ] && exit $rc
+
+# Check the proxy status
+$BINPATH/check-proxy
+
+INSTCONF="/tmp/temp.conf.$$"
+WMSVOCONF="/tmp/temp.wmsvoconf.$$"
+WMSCMDCONF="/tmp/temp.wmscmdconf.$$"
+
+# Temp files for site info and tags
+TMPSITEINFO="/tmp/siteinfo.$$"
+
+# Create the final exclude list
+EXCLLST=/tmp/ljsf.exclude.list.tmp.$$
+[ -s $EXCLUDELIST ] && cp $EXCLUDELIST $EXCLLST
+#ljsfinfo.py --select='distinct(site.cename)' --site-disabled --quiet | sed 's/"//g' >> $EXCLLST
+ljsfinfo.py --list-ce --site-disabled --quiet | sed 's/"//g' >> $EXCLLST
+if [ "$DEBUG" == "yes" ] ; then
+    echo "==================="
+    echo "Using exclude list:"
+    echo "==================="
+    cat $EXCLLST
+    echo "==================="
+fi
+
+# Prepare the tools and template
+LISTMATCH="`which $LJSF_JOBLISTMATCH`"
+if [ "$LISTMATCH" == "" ] ; then
+    echo "Cannot find $LJSF_JOBLISTMATCH"
+    exit -1
+fi
+if [ "$TMPL" == "" ] ; then
+    TEMPLATE="$TEMPLATEPATH/query-${TASK}.jdl.template"
+else
+    TEMPLATE="$TEMPLATEPATH/${TMPL}.jdl.template"
+fi
+if [ ! -s "${TEMPLATE}" ] ; then
+    echo "Cannot find template file ${TEMPLATE}"
+    exit -1
+fi
+
+# Get info on the sites
+TEMPLIST="/tmp/ljsfi.ac.celist.$$.tmp"
+[ ! -f ${EXCLLST} ] && touch ${EXCLLST}
+[ "$DEBUG" != "" ] && echo "Getting the list of the $VO CE resources using lcg-info"
+if [ -n "$CE" ] ; then
+    lcg-info --vo $VO --list-ce | grep 'CE:' | cut -d':' -f 2- | sed 's/^ *//g' | grep -v -f ${EXCLLST} | grep $CE > $TEMPLIST
+else
+    lcg-info --vo $VO --list-ce | grep 'CE:' | cut -d':' -f 2- | sed 's/^ *//g' | grep -v -f ${EXCLLST} > $TEMPLIST
+fi
+[ "$DEBUG" == "yes" ] && echo "`cat $TEMPLIST | wc -l` $VO CE resources matching the requirements"
+cat ${TEMPLIST} | while read line; do
+    CS="`echo $line | awk '{print $1}'`"
+    TMPRESINFO=${TMPSITEINFO}.`echo $CS | sed 's#[-:/.]#_#g'`
+    [ "$DEBUG" == "yes" ] && echo "Getting site info for $CS"
+    [ ! -s "$TMPRESINFO" ] && get-site-info $CS 2> /dev/null > $TMPRESINFO
+    SITENAME="`grep ^GlueSiteName $TMPRESINFO | tail -n 1 | awk '{print $2}'`"
+    TMPSITERES=${TMPSITEINFO}.site.$SITENAME
+    echo $CS >> $TMPSITERES
+done
+
+
+# Check for DB inconsistencies
+cat ${TEMPLIST} | while read line; do
+    CS="`echo $line | awk '{print $1}'`"
+    CENAME="`echo $CS | cut -d: -f 1`"
+    TMPRESINFO=${TMPSITEINFO}.`echo $CS | sed 's#[-:/.]#_#g'`
+    SITENAME="`grep ^GlueSiteName $TMPRESINFO | tail -n 1 | awk '{print $2}'`"
+    TMPSITERES=${TMPSITEINFO}.site.$SITENAME
+    GNAME="`cat ${TMPRESINFO} | grep ^gridName | tail -n 1 | awk '{print $2}'`"
+    if [ -n "$SITENAME" ] ; then
+        [ "$DEBUG" == "yes" ] && echo "Checking $CS [$SITENAME]"
+        show-tags -w -C -q $CS | while read TAG; do
+            RELNAME="`ljsfinfo.py --select="DISTINCT(release_data.name)" --reltag=$TAG --quiet | sed 's/"//g' | tail -n 1`"
+            if [ -n "$RELNAME" ] ; then
+                # Check if this release is installed in the site
+                for sr in `cat $TMPSITERES`; do
+                    RELSTAT="`ljsfinfo.py --select=release_stat.status --rel=$RELNAME --cs=$sr --quiet | sed 's/"//g'`"
+                    [ -n "$RELSTAT" ] && break
+                done
+                if [ "$RELSTAT" != "maxrmretry" ] ; then
+                    echo "Inconsistency found for $TAG in $CS [$SITENAME] : release $RELNAME"
+                    REQID="`ljsfreq.py --query --cs=$CS --rel=$RELNAME --reqtype=$TASK | tail -n 1 | cut -d, -f 1`"
+                    if [ -n "$REQID" ] ; then
+                        if [ $MAXFAILURES -gt 0 ] ; then
+                            FAILURES="`ljsfbkk.py --select=job.exit_code --dest=$CENAME --last=$((MAXFAILURES+1)) --quiet --rel=$RELNAME | grep -v ^0 | wc -l`"
+                        else
+                            FAILURES=-1
+                        fi
+                        if [ $FAILURES -gt $MAXFAILURES ] ; then
+                            echo "Too many failures ($FAILURES) for release $RELNAME in $CENAME"
+                            ljsfinfo.py --status=maxinstretry --rel=$RELNAME --cs=$CS
+                        else
+                            [ "$DEBUG" != "" -a $FAILURES -ge 0 ] && echo "Number of failures for release $RELNAME in $CENAME: $FAILURES [OK]"
+                            [ "$VERBOSE" == "yes" -o "$DEBUG" == "yes" ] && echo "Restarting task $TASK in $CS [$GNAME]"
+                            if [ "$TRIAL" == "yes" ] ; then
+                                echo "ljsfreq.py --update --reqid=$REQID --status=autorun"
+                            else
+                                ljsfreq.py --update --reqid=$REQID --status=autorun
+                            fi
+                        fi
+                    else
+                        [ "$VERBOSE" == "yes" -o "$DEBUG" == "yes" ] && echo "Requesting task $TASK in $CS [$GNAME]"
+                        if [ "$TRIAL" == "yes" ] ; then
+                            echo "ljsfreq.py --cs=$CS --rel=$RELNAME --reqtype=$TASK --sitename=$SITENAME --status=autorun --grid-name=$GNAME --default-site-status=$DSSTATUS --comments='Tag inconsistency. Checking the release.' 2>/dev/null"
+                        else
+                            ljsfreq.py --cs=$CS --rel=$RELNAME --reqtype=$TASK --sitename=$SITENAME --status=autorun --grid-name=$GNAME --default-site-status=$DSSTATUS --comments='Tag inconsistency. Checking the release.' 2>/dev/null
+                        fi
+                    fi
+                fi
+            fi
+        done
+    else
+        echo "Cannot get the site name of $CS"
+    fi
+done
+
+# Clean up
+rm -f ${TEMPLIST}
+rm -f $WMSVOCONF
+rm -f $WMSCMDCONF
+rm -f ${TMPSITEINFO}*
+rm -f $EXCLLST
+
+exit 0

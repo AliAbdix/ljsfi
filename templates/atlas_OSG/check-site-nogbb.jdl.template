@@ -1,0 +1,8 @@
+Executable = "check-site-nogbb.sh";
+InputSandbox = {"@SCRIPTPATH@/check-site-nogbb.sh","@SCRIPTPATH@/gbb"};
+OutputSandbox = {"@SITE_CENAME@-site-params.txt","stderr"};
+stdoutput = "@SITE_CENAME@-site-params.txt";
+stderror = "stderr";
+VirtualOrganisation = "atlas";
+MaxCPUTime=800;
+Requirements = other.GlueCEUniqueId=="@SITE_CS@";

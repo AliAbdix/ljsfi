@@ -1,0 +1,37 @@
+<title>How to install carefully</title>
+<body background="sky.gif">
+<p>
+<h1><font color=navy>How to install carefully</font></h1>
+<p>
+<hr size=5>
+<p>
+To install software with Pacman, you have to agree to trust caches.  Even with this trust, however, Pacman gives
+you a number of tools for being careful about installing a package from a remote site.  If you are thinking about installing 
+<b>BU:Python</b> for example, you can first
+<ul>
+<li> Browse the package with 
+<pre><b><font color="#8B0000">% pacman -l BU:Python
+</font></pre></b>
+<li> Fetch the package before installing it with 
+<pre><b><font color="#8B0000">% pacman -fetch BU:Python
+</font></pre></b>
+<li> Examine all the shell commands that might be executed with 
+<pre><b><font color="#8B0000">% pacman -domain -dom all | grep shell
+</font></pre></b>
+<li> You can extract and examine the Pacman source codes before installation with
+<pre><b><font color="#8B0000">% pacman -extract-sources .
+</font></pre></b>
+<li> You can extract and examine all of the downloads before installation with
+<pre><b><font color="#8B0000">% pacman -extract-downloads .
+</font></pre></b>
+<li> Step through the installation stopping at every shell command with
+<pre><b><font color="#8B0000">% pacman -install -ask shell
+</font></pre></b>
+or with <b>% pacman -install -ask action</b> to stop at each Pacman action.
+</ul>
+You can also use caches accessible via Globus or SSH to take advantage of standard SSH or Globus authentication mechanisms.
+<p>
+<hr size=5>
+<h3><a href="http://physics.bu.edu/pacman/" target="_blank">Pacman Headquarters</a></h3>
+<p>
+</body>

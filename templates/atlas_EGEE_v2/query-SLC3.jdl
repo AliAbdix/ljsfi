@@ -1,0 +1,7 @@
+Executable = "/bin/hostname";
+OutputSandbox = {"stdout","stderr"};
+stdoutput = "stdout";
+stderror = "stderr";
+VirtualOrganisation = "atlas";
+Requirements = ( other.GlueHostOperatingSystemRelease >= 4.0 );
+#Requirements = other.GlueCEPolicyMaxCPUTime > 1500;

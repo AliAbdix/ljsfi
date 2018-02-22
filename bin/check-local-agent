@@ -1,0 +1,7 @@
+#!/bin/sh
+ljsfbkk.py --select="job.name" --validation=pending --user=${USER}@`hostname -f` --quiet | \
+while read jn; do
+    [ ! -s "jobs/$jn" ] && rescue $jn
+done
+
+exit

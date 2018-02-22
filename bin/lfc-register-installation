@@ -1,0 +1,33 @@
+#!/bin/sh
+
+LFN=${1}
+
+VO=atlas
+COLL="/grid/atlas/install/lcg"
+export LFC_HOST="lfc-$VO-test.cern.ch"
+export LCG_CATALOG_TYPE=edg
+
+REPLICA_LIST=replica-list.$$
+lcg-lr --vo $VO lfn:$LFN > $REPLICA_LIST
+
+export LCG_CATALOG_TYPE=lfc
+cat $REPLICA_LIST | while read SURL; do
+  if [ "$GUID" == "" ] ; then
+    echo "Getting GUID for lfn:$COLL/$LFN"
+    GUID="`lcg-lg --vo $VO lfn:$COLL/$LFN 2>/dev/null`"
+    if [ "$GUID" == "" ] ; then
+      echo "Registering lfn:$COLL/$LFN"
+      echo lcg-rf --vo $VO -l $COLL/$LFN $SURL
+      lcg-rf --vo $VO -l $COLL/$LFN $SURL
+      GUID="`lcg-lg --vo $VO lfn:$COLL/$LFN 2>/dev/null`"
+      if [ "$GUID" == "" ] ; then
+         echo "Cannot register file in LFC"
+         exit -1
+      fi
+      echo "File registered with $GUID"
+    fi
+  fi
+  echo "Registering replica for $GUID"
+  lcg-rf --vo $VO -t 10 -g $GUID -l $COLL/$LFN $SURL
+done
+rm -fr $REPLICA_LIST

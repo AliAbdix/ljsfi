@@ -1,0 +1,35 @@
+# Function to submit jobs
+submitJDL()
+{
+  RES="$1"
+  JDL="$2"
+  shift 2
+
+  TSTAMP=`date +%s`
+  JOBFILE=`basename $JDL | sed "s/.jdl/.$TSTAMP$$.job/"`
+  JOBPATH=`dirname $JDL`/../jobs
+  mkdir -p $JOBPATH
+  
+  ljsfinfo.py --set-lock --jdlname="`basename $JDL`"
+  if [ $? == 0 ] ; then
+    gbb -l 300 $LJSF_JOBSUBMIT $JDL 2>&1 > $JOBPATH/$JOBFILE
+    JOBID="`cat $JOBPATH/$JOBFILE 2>/dev/null | grep "^PandaID" | sed 's/^PandaID=\(.*\)/\1/'`"
+    JOBODS="`cat $JOBPATH/$JOBFILE 2>/dev/null | grep "^DatasetName" | sed 's/^DatasetName=\(.*\)/\1/'`"
+    [ -n "$JOBODS" ] && JOBODS_OPT="--set-output dataset:$JOBODS"
+    if [ -n "$JOBID" ] ; then
+      ljsfbkk.py --insert --jobid="$JOBID" --jobname="$JOBFILE" \
+                 --validation="pending" --jdlname="`basename $JDL`" \
+                 --jdlfile="$JDL" --facility="Panda" --cs=$RES \
+                 --subtime="`date +'%Y-%m-%d %H:%M:%S'`" $REQID_OPT $ADMINID $JOBODS_OPT
+      echo "$JDL submitted (jobfile: $JOBPATH/$JOBFILE)"
+    else
+      ljsfinfo.py --remove-lock --jdlname="`basename $JDL`"
+      echo "Failed to submit $JDL"
+      cat $JOBPATH/$JOBFILE
+      rm -f $JOBPATH/$JOBFILE
+      exit 2
+    fi
+  else
+    exit $?
+  fi
+}

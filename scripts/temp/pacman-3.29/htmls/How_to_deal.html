@@ -1,0 +1,35 @@
+<title>How to test for Linux Kernel, gcc versions etc.</title>
+<body background="sky.gif">
+<p>
+<h1><font color=navy>How to test for Linux Kernel, gcc versions etc.</font></h1>
+<p>
+<hr size=5>
+<p>
+    If you are writing some Pacman source code and you want to require that a particular package be available at a
+particular point in your installation, you just do something like
+<pre><b><font color="#8B0000">package('Demo:Python | versionGE("2.2")')
+</font></pre></b>
+Sometimes, however, it is useful to be able to test for non-Pacman installed software or to test for 
+<a href="SystemProperties.html">system properties</a>.  The language contains special atoms for you to test common
+"natively installed software" such as gcc, perl, the linux kernel, etc.  You can also test many other system
+properties.  For an example of this, do
+<pre><b><font color="#8B0000">% pacman -get Demo:system
+% pacman -d cmp -l 
+</font></pre></b>
+to some of these atoms in action on your system.  The language let's you, in effect, decide to accept non-Pacman
+installed software optionally depending on conditions that you define.  You can test the conditions, and if they are
+not satisified, install the package as a Pacman package.  Here's a simple example that installs Python > 2.2 from
+the Demo cache, but only if necessary.
+<pre><b><font color="#8B0000">{ pythonVersionGE("2.2") OR package('Demo:Python | versionGE("2.2")' }
+</font></pre></b>
+<p>
+One other nice trick is to use <a href="Shells.html">ShellOutputGE</a> to execute a shell command and test on the
+value of the output.  For instance, this bit of code
+<pre><b><font color="#8B0000">shellOutputGE('wget -V','GNU Wget 1.9')
+</font></pre></b>
+makes sure that <b>wget</b> version 1.9 or greater is installed on the system.
+<p>
+<hr size=5>
+<h3><a href="http://physics.bu.edu/pacman/" target="_blank">Pacman Headquarters</a></h3>
+<p>
+</body>

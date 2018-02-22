@@ -1,0 +1,43 @@
+<title>Updating</title>
+<body background="sky.gif">
+<p>
+<h1><font color=navy>Updating</font></h1>
+<p>
+<hr size=5>
+<p>
+    When you fetch or install a package with Pacman, Pacman also records which cache the package came from.  If the
+package then changes, over time, Pacman has the ability to re-fetch the package and compare it to what's in your
+local installation.  If there is a difference, Pacman indicates that an update of the package is available.  As a
+user of Pacman, you can see if such updates are available, view the differences and then update the software you so choose.  
+Pacman will never update installed packages without your explicit permission.
+<p>
+   To give an example of this procedure, we have to install from a cache where you can modify the contents yourself.  
+To do this, cd to a new working directory and do
+<pre><b><font color="#8B0000">% pacman -get $PACMAN_LOCATION/democache:FooPackage
+</font></pre></b>
+This installs <b>FooPackage</b> from a sample cache that comes with your copy of Pacman.  Now edit the file 
+<b>$PACMAN_LOCATION/democache:FooPackage.pacman</b> and change something, for instance the message in the
+<b>message</b> command.  Then go back to your installation and do
+<pre><b><font color="#8B0000">% pacman -update-check
+% pacman -l
+</font></pre></b>
+You will see that the package FooPackage has an update available.  To view the original source compared with the update, do 
+<pre><b><font color="#8B0000">% pacman -d src ups 0 -l
+</font></pre></b>
+and Pacman will display both the current source code (that's what the <b>-d src</b> switch does) and the updated
+source code (that's what the <b>-d ups</b> switch does).
+<p>
+If, after these considerations, you decide that you want to update your installation, just do
+<pre><b><font color="#8B0000">% pacman -update
+</font></pre></b>
+and Pacman will remove <b>FooPackage</b> and re-install the new FooPackage.
+<p>
+    When Pacman does updating, it may also have to remove and re-install other packages in order to do the update
+properly.  For example, if other packages have configured <b>FooPackage</b>, Pacman would have to remove and
+re-install those packages as well.  For this reason, if you update, you will sometimes see other packages being
+re-installed besides the package that has actually changed.
+<p>
+<hr size=5>
+<h3><a href="http://physics.bu.edu/pacman/" target="_blank">Pacman Headquarters</a></h3>
+<p>
+</body>

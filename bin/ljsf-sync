@@ -1,0 +1,51 @@
+#!/bin/sh
+TMPFILELIST=/tmp/rescue.$$.list
+[ -z "$MAXTHREADS" ] && MAXTHREADS=5
+rm -f $TMPFILELIST
+
+# Get the list of all jobs of this machine
+ljsfbkk.py --select="job.name" --validation=pending --user=${USER}@${HOSTNAME} --quiet | \
+while read JOBNAME; do
+    if [ ! -s $JOBSPATH/$JOBNAME ] ; then
+        echo "$JOBNAME" >> $TMPFILELIST
+    fi
+done
+
+# Rescue the job definitions
+NFILES="`cat $TMPFILELIST 2>/dev/null | wc -l`"
+FINDX=0
+if [ $NFILES -gt 0 ] ; then
+    echo "Rescuing $NFILES jobs"
+    cat $TMPFILELIST | while read JOBNAME; do
+        FINDX=$((FINDX+1))
+        NJOBS=`jobs -p | wc -l`
+        while [ $NJOBS -ge $MAXTHREADS ] ; do
+            [ -z "$OUTSENT" ] && echo "Jobs running = $NJOBS => waiting"
+            sleep 5s
+            OUTSENT="y"
+            NJOBS=`jobs -p | wc -l`
+        done
+        unset OUTSENT
+        (
+            rescue $JOBNAME
+            get-output -nuz $JOBSPATH/$JOBNAME
+            if [ ! -s $JOBSPATH/$JOBNAME ] ; then
+                VPJOBID="`ljsfbkk.py --select="job.id" --validation="pending" --jobname="$JOBNAME" --quiet`"
+                if [ -n "$VPJOBID" ] ; then
+                    echo "Cleaning up job validation status"
+                    ljsfbkk.py --insert --jobid="$VPJOBID" --validation="failed" --jobcomments="Forced failure"
+                fi
+            fi
+        ) &
+        PERCDONE=$((100*FINDX/NFILES))
+        echo "==> ${PERCDONE}% done"
+        [ $FINDX == $NFILES ] && wait
+    done
+    wait
+else
+    echo "No jobs to rescue"
+fi
+
+# Cleanup
+rm -f $TMPFILELIST
+exit

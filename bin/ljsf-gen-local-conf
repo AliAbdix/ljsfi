@@ -1,0 +1,111 @@
+#!/bin/sh
+cat <<EOD
+#########################################################
+#               LJSFi local setup wizard                #
+#                LJSFi 1.9.2 - 20100107                 #
+# Alessandro De Salvo <Alessandro.DeSalvo@roma1.infn.it #
+#########################################################
+EOD
+
+CFGTEMPLATE="$CONFPATH/ljsflocal.conf.template"
+CFGFILE="`echo $CONFPATH/ljsflocal.conf.template | sed 's/.template$//g'`"
+DEFAGENTCERT="$LJSF_SECURITY/agent.crt"
+DEFAGENTKEY="$LJSF_SECURITY/agent.key"
+DEFVO="atlas"
+DEFVOMS="$DEFVO:/$DEFVO/Role=lcgadmin"
+DEFAUTH="grid:voms"
+DEFCATALOG="lfc"
+DEFLFC="lfc-$DEFVO.cern.ch"
+DEFDBHOST="$DEFVO-install.roma1.infn.it"
+DEFDBUSER="ljsfidbw"
+DEFDBNAME="ljsfi_$DEFVO"
+DEFDBURL="https://${DEFVO}-install.roma1.infn.it/${DEFVO}_install/protected"
+DEFMINPROXY=18000
+DEFMAXPROXY=172800
+DEFMAXMYPROXY=600
+DEFMAXGRIDPROXY=300
+DEFMYPROXY="myproxy.cern.ch"
+DEFGBBSURL="srm://grid-cert-03.roma1.infn.it/srm/managerv2?SFN=/dpm/roma1.infn.it/home/atlas/gbb"
+
+read -p "Agent certificate file [$DEFAGENTCERT]: " LJSFAGENTCERT
+[ "$LJSFAGENTCERT" == "" ] && LJSFAGENTCERT="$DEFAGENTCERT"
+[ ! -s $LJSFAGENTCERT ] && echo "WARNING: agent certificate not found!"
+read -p "Agent key file [$DEFAGENTKEY]: " LJSFAGENTKEY
+[ "$LJSFAGENTKEY" == "" ] && LJSFAGENTKEY="$DEFAGENTKEY"
+[ ! -s $LJSFAGENTKEY ] && echo "WARNING: agent key not found!"
+read -p "VO name [$DEFVO]: " VO
+[ "$VO" == "" ] && VO="$DEFVO"
+read -p "VOMS FQAN [$DEFVOMS]: " VOMS
+[ "$VOMS" == "" ] && VOMS="$DEFVOMS"
+read -p "LJSFi authentication type [$DEFAUTH]: " LJSFAUTHTYPE
+[ "$LJSFAUTHTYPE" == "" ] && LJSFAUTHTYPE="$DEFAUTH"
+read -p "Catalog type [$DEFCATALOG]: " LCG_CATALOG_TYPE
+[ "$LCG_CATALOG_TYPE" == "" ] && LCG_CATALOG_TYPE="$DEFCATALOG"
+read -p "LFC hostname [$DEFLFC]: " LFC_HOST
+[ "$LFC_HOST" == "" ] && LFC_HOST="$DEFLFC"
+read -p "LJSFi DB hostname [$DEFDBHOST]: " LJSFDBHOST
+[ "$LJSFDBHOST" == "" ] && LJSFDBHOST="$DEFDBHOST"
+read -p "LJSFi DB name [$DEFDBNAME]: " LJSFDBNAME
+[ "$LJSFDBNAME" == "" ] && LJSFDBNAME="$DEFDBNAME"
+read -p "LJSFi DB username [$DEFDBUSER]: " LJSFDBUSER
+[ "$LJSFDBUSER" == "" ] && LJSFDBUSER="$DEFDBUSER"
+read -p "LJSFi DB password: " -s LJSFDBPASS
+echo
+read -p "LJSFi DB URL [$DEFDBURL]: " LJSFDBURL
+[ "$LJSFDBURL" == "" ] && LJSFDBURL="$DEFDBURL"
+read -p "Minimum proxy time left before renewal in seconds [$DEFMINPROXY]: " LJSF_MINPROXY_LT
+[ "$LJSF_MINPROXY_LT" == "" ] && LJSF_MINPROXY_LT="$DEFMINPROXY"
+read -p "Maximum proxy life time in seconds [$DEFMAXPROXY]: " LJSF_MAXPROXY_LT
+[ "$LJSF_MAXPROXY_LT" == "" ] && LJSF_MAXPROXY_LT="$DEFMAXPROXY"
+read -p "Maximum MyProxy life time in hours [$DEFMAXMYPROXY]: " LJSF_MAXMYPROXY_LT
+[ "$LJSF_MAXMYPROXY_LT" == "" ] && LJSF_MAXMYPROXY_LT="$DEFMAXMYPROXY"
+read -p "Maximum long grid proxy life time in hours [$DEFMAXGRIDPROXY]: " LJSF_MAXGRIDPROXY_LT
+[ "$LJSF_MAXGRIDPROXY_LT" == "" ] && LJSF_MAXGRIDPROXY_LT="$DEFMAXGRIDPROXY"
+read -p "MyProxy server [$DEFMYPROXY]: " LJSF_MYPROXYSERVER
+[ "$LJSF_MYPROXYSERVER" == "" ] && LJSF_MYPROXYSERVER="$DEFMYPROXY"
+read -p "GriBB SURL to store partial logfiles [$DEFGBBSURL]: " GBB_SURL
+[ "$GBB_SURL" == "" ] && GBB_SURL="$DEFGBBSURL"
+
+echo "Generating configuration file $CFGFILE"
+sed -e "s#@LJSFAGENTCERT@#$LJSFAGENTCERT#g" \
+    -e "s#@LJSFAGENTKEY@#$LJSFAGENTKEY#g" \
+    -e "s#@VO@#$VO#g" \
+    -e "s#@VOMS@#$VOMS#g" \
+    -e "s#@LJSFAUTHTYPE@#$LJSFAUTHTYPE#g" \
+    -e "s#@LCG_CATALOG_TYPE@#$LCG_CATALOG_TYPE#g" \
+    -e "s#@LFC_HOST@#$LFC_HOST#g" \
+    -e "s#@LJSFDBNAME@#$LJSFDBNAME#g" \
+    -e "s#@LJSFDBURL@#$LJSFDBURL#g" \
+    -e "s#@LJSF_MINPROXY_LT@#$LJSF_MINPROXY_LT#g" \
+    -e "s#@LJSF_MAXPROXY_LT@#$LJSF_MAXPROXY_LT#g" \
+    -e "s#@LJSF_MAXMYPROXY_LT@#$LJSF_MAXMYPROXY_LT#g" \
+    -e "s#@LJSF_MAXGRIDPROXY_LT@#$LJSF_MAXGRIDPROXY_LT#g" \
+    -e "s#@LJSF_MYPROXYSERVER@#$LJSF_MYPROXYSERVER#g" \
+    -e "s#@GBB_SURL@#$GBB_SURL#g" \
+    $CFGTEMPLATE > $CFGFILE
+
+echo "Generating database access configuration file $CONFPATH/.my.cnf"
+cat > $CONFPATH/.my.cnf <<EOD
+[client]
+user = $LJSFDBUSER
+password = $LJSFDBPASS
+host = $LJSFDBHOST
+
+[mysql]
+database = $LJSFDBNAME
+EOD
+
+echo
+echo "######################################"
+echo "Local configuration completed"
+echo "Please make sure you have your personal certificate installed"
+echo "and register both your agent and your local user"
+echo "using the following commands:"
+echo "    ljsfregister.py"
+echo "    ljsfregister.py --local"
+echo "You should also define a set of templates to be used by your VO"
+echo "The VO templates must be kept in templates/$VO"
+echo "For your convenience a sample set of generic templates is supplied"
+echo "######################################"
+echo
+exit

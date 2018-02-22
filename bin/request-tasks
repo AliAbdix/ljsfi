@@ -1,0 +1,60 @@
+#!/bin/sh
+
+help()
+{
+  echo "HELP"
+  echo "`basename $0`: Auto request tasks"
+  echo "Usage: `basename $0` [OPTIONS]"
+  echo "       OPTIONS:"
+  echo "            -h|--help           Display this help."
+  echo "            -d|--debug          Debug output."
+  echo "            -t|--trial          Perform a trial run, no submission."
+  echo "            -v|--verbose        Verbose output"
+  exit 0
+}
+
+OPTS=`getopt -o hdtv -l help,debug,trial,verbose -- "$@"`
+if [ $? != 0 ] ; then echo "Terminating..."; exit -1 ; fi
+eval set -- "$OPTS"
+while true ; do
+        case "$1" in
+                -h|--help)         help; shift;;
+                -d|--debug)        DEBUG="-d"; shift;;
+                -t|--trial)        TRIAL="-t"; shift;;
+                -v|--verbose)      VERBOSE="y"; shift;;
+                --)                shift ; break ;;
+                \?)                break ;
+                exit ;;
+        esac
+done
+
+ljsfinfo.py --list-autoinstall-targets | egrep -v "^none|^all" | awk '{print $1}' | \
+while read target; do
+    # Validations
+    # Base releases
+    if [ "$VERBOSE" == "" ] ; then
+      autorequest $TRIAL -T validation -b --target $target --template query-$target-validation &> /dev/null
+    else
+      echo "Requesting validation tasks for base releases for $target targets"
+      echo autorequest $TRIAL $DEBUG -T validation -b --target $target --template query-$target-validation
+      autorequest $TRIAL $DEBUG -T validation -b --target $target --template query-$target-validation
+    fi
+
+    # Patch releases
+    if [ "$VERBOSE" == "" ] ; then
+      autorequest $TRIAL $DEBUG -T validation -p --target $target --template query-$target-validation-patch &> /dev/null
+    else
+      echo "Requesting validation tasks for patch releases for $target targets"
+      autorequest $TRIAL $DEBUG -T validation -p --target $target --template query-$target-validation-patch
+    fi
+
+    # Removals
+    if [ "$VERBOSE" == "" ] ; then
+      autorequest $TRIAL $DEBUG -T removal -o --target $target --template query-$target-removal-patch &> /dev/null
+    else
+      echo "Requesting removal tasks for $target targets"
+      autorequest $TRIAL $DEBUG -T removal -o --target $target --template query-$target-removal-patch
+    fi
+done
+
+exit

@@ -1,0 +1,66 @@
+<title>Advanced updating tutorial II: Cache hierarchies/Snapshots/Updating</title>
+<body background="sky.gif">
+<p>
+<h1><font color=navy>Advanced updating tutorial II: Cache hierarchies/Snapshots/Updating</font></h1>
+<p>
+<hr size=5>
+<p>
+   This tutorial continues from the previous tutorial in order to make a few additional points about
+cache hierarchies and how cache lists, snapshots and updating all work together.
+<p>
+<h3><font color=navy>Cache hierarchies</font></h3>
+<p>
+Let's begin by asking who should maintain the Pacman cache for a particular body of software?  Ideally, this will
+be the developers of the software since they know best how to install and configure their own software.  Given
+trust in these caches, installers gain the ability to use any consistent combination of this software that they
+like.  Pacman provides the mechanism for installing, configuring and setting up software and for checking
+consistency.  Although this setup is very helpful, if you start to use a diverse enough body of software, the
+problem will be that so many updates become available that it will be difficult to decide whether to take a
+particular update or not.  Also, if a research project decides to use one of these developer caches, they often
+want to have coordinated updating of their sites and don't necessarily want to do this every time a developer
+updates their Pacman caches. 
+<p>
+   As discussed in the previous tutorial, this problem can be neatly solved by using cache lists to delegate the
+the decision about when updates appear at sites.  If the sites involved in a particular project install from a
+common cache list, then the person controlling the cache list can decide when updates from the developer caches
+should appear at the project's various installations.  This happens without disturbing the developers and it
+presents a very simple picture to the installers: accept all updates as they appear.  In the previous tutorial, we
+showed how this works for a cache list pointing to snapshots of a particular cache.  Here we practice a little bit
+more showing that you can make hierarchies of cache lists as deep as you like, that you can make snapshots of
+snapshots and point out that snapshots capture cache hierarchies to arbitrary depths.
+<p>
+Take the caches setup in the previous tutorial, and make three
+caches files <b>A.caches</b>, <b>B.caches</b>, <b>C.caches</b> where <b>A.caches</b> points to <b>B.caches</b>
+which points to <b>C.caches</b>, which points to <b>myDemo.caches</b> which ultimately points to <b>Demo</b>.
+This represents a hierarchy of caches where usually different people will be maintaining <b>A,B,C.caches</b>
+over time.  Now practice installing Python in various ways with
+<pre><b><font color="#8B0000">% pacman -get A.caches:Python
+% pacman -get A.caches:Demo:Python
+% pacman -get B.caches:C.caches:Demo:Python
+% pacman -get A.caches:Demo:Python
+</font></pre></b>
+to see that they work.  When you do
+<pre><b><font color="#8B0000">% pacman -get A.caches:C.caches:Python
+</font></pre></b>
+for example, you are specifying both where <b>Python</b> comes from and how it is updated.  When searching for an update of
+Python, pacman will again go through <b>A.caches</b> and <b>B.caches</b> and so the people controlling <b>A.caches</b> and
+<b>B.caches</b> can determine if and when an update of Python appears available to you.  On the other hand, you always have
+the ability to install Python directly or to specify the whole search path
+<pre><b><font color="#8B0000">% pacman -get A.caches:B.caches:C.caches:myDemo.caches:Demo:Python
+</font></pre></b>
+To show that this works nicely with snapshots, do
+<pre><b><font color="#8B0000">% pacman -snap A.caches
+</font></pre></b>
+as illustrated below.
+<p>
+<img src="fig3.gif" height=500 width=700>
+<p>
+Since the snapshot preserves the hierarchy of caches, you can still do
+<pre><b><font color="#8B0000">% pacman -get A.snap:A.caches:C.caches:Python
+</font></pre></b>
+as before.  Snapshots effectively capture arbitrary cache hierarchies.
+<p>
+<hr size=5>
+<h3><a href="http://physics.bu.edu/pacman/" target="_blank">Pacman Headquarters</a></h3>
+<p>
+</body>

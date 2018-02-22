@@ -1,0 +1,23 @@
+<title>How to make a package that configures another package</title>
+<body background="sky.gif">
+<p>
+<h1><font color=navy>How to make a package that configures another package</font></h1>
+<p>
+<hr size=5>
+<p>
+     It is sometimes necessary to modify the contents of an installed package.  If you find that you
+have to do this, you should <i>always</i> install the package with 
+<a href="package.html">configure</a> rather than <b>package</b>.  In the unlikely event that you are
+configuring Python, for instance, you should install it with, for example, 
+<pre><b><font color="#8B0000">configure('BU:Python | version("2.3.3")')
+</font></pre></b>
+rather than with
+<pre><b><font color="#8B0000">package('BU:Python | version("2.3.3")')
+</font></pre></b>
+Pacman installs the package the same way in both cases, but the configure syntax let's Pacman know that
+if Python is updated, for example, your package must also be re-installed.
+<p>
+<hr size=5>
+<h3><a href="http://physics.bu.edu/pacman/" target="_blank">Pacman Headquarters</a></h3>
+<p>
+</body>

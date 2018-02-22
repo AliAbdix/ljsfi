@@ -1,0 +1,34 @@
+#!/bin/sh
+
+RELEASE="$1"
+TMPLIST=cpufree.tmp.$$
+
+if [ "$RELEASE" == "" ] ; then
+  echo "Usage: `basename $0` <release number>"
+  exit -1
+fi
+
+#Check the DB status
+$BINPATH/dbcheck
+rc=$?
+[ $rc -ne 0 ] && exit $rc
+
+lcg-infosites --vo atlas ce | grep -e ".*:2119/.*" -e ".*:8443/.*" | while read siteinfo; do
+  cs="`echo $siteinfo | awk '{print $6}'`"
+  cputot="`echo $siteinfo | awk '{print $1}'`"
+  cpufree="`echo $siteinfo | awk '{print $2}'`"
+  ljsfinfo.py --select=site.cs --status=installed --cs="$cs" --rel="$RELEASE" | grep -q -e ".*:2119/.*" -e ".*:8443/.*"
+  [ $? == 0 ] && echo "$cputot $cpufree $cs" >> $TMPLIST
+done
+
+if [ -s $TMPLIST ] ; then
+  res="`cat $TMPLIST | awk 'BEGIN {tot=0;free=0}{tot+=$1; free+=$2} END {print tot" "free" "free/tot*100.}'`"
+  tot="`echo $res | cut -d' ' -f 1`"
+  free="`echo $res | cut -d' ' -f 2`"
+  frac="`echo $res | cut -d' ' -f 3`"
+  echo "Total number of CPU available for release $RELEASE: $tot" 
+  echo "Total number of CPU free for release $RELEASE:      $free ($frac %)"
+fi
+rm -fr $TMPLIST
+
+exit

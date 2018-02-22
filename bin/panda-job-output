@@ -1,0 +1,96 @@
+#!/bin/sh
+
+help() {
+cat <<EOD
+Usage: `basename $0` [OPTION] <jobid>
+   OPTIONS
+   -------
+   --debug                            Enable debug output
+   --dir <path>                       Save the files in <path>
+   --help|-h                          Display this help
+   --timeout|-t <seconds>             Timeout in seconds
+
+$VERSION
+Alessandro De Salvo <Alessandro.DeSalvo@roma1.infn.it>
+EOD
+}   
+
+timeout () {
+    perl -e 'alarm shift; exec @ARGV' "$@";
+}
+
+VERSION="panda-job-output v1.0.0 - 20130302"
+PATTERN="payload* install*.xml"
+OPTS=`getopt -o d:ht: -l debug,dir:,help,timeout: -- "$@"`
+if [ $? != 0 ] ; then echo "Terminating..."; exit 1 ; fi
+eval set -- "$OPTS"
+
+while true ; do
+    case "$1" in
+        --debug)               DEBUG="yes";shift;;
+        --dir|-d)              OUTDIR="$2";shift 2;;
+        --help|-h)             help;exit;;
+        --timeout|-t)          TIMEOUT="timeout $2";shift 2;;
+        --)                    shift;break;;
+        \?)                    break;
+        exit;;
+    esac
+done
+
+JOBID="$1"
+if [ -z "$JOBID" ] ; then
+    echo "Please specify a job id"
+    help
+    exit 1
+fi
+
+OUTINFO="`eval $TIMEOUT ljsfbkk.py --select=output --jobid=${JOBID} --quiet`"
+JOBLOG="`echo ${OUTINFO} | cut -d, -f 3 | sed 's/^ *\(.*\)/\1/'`"
+DSETSCOPE="panda"
+JOBDSET="`echo ${OUTINFO} | cut -d, -f 4 | sed 's/^ *\(.*\)/\1/'`"
+JOBOUTFILE=${JOBDSET}.job.log.tgz
+[ -z "$OUTDIR" ] && OUTDIR=$JOBDSET
+[[ "$OUTDIR" != /* ]] && OUTDIR="$PWD/$OUTDIR"
+[ ! -d $OUTDIR ] && mkdir -p $OUTDIR
+
+echo "Saving contents of $JOBOUTFILE into $OUTDIR"
+
+# Setup DQ2
+. /cvmfs/atlas.cern.ch/repo/sw/ddm/latest/setup.sh
+
+CURDIR=$PWD
+TEMPDIR=/tmp
+MAXDSAGE="5"
+cd /tmp 
+JOBDSETINFO="`eval $TIMEOUT rucio list-replicas ${DSETSCOPE}:${JOBDSET} | grep ${JOBDSET}`"
+if [ -n "$JOBDSETINFO" ] ; then
+    JOBDSETLOC="`echo $JOBDSETINFO | awk '{print $5}' | grep -v '^$' | sort | uniq`"
+    echo "Dataset is stored in $JOBDSETLOC. Setting lifetime to $MAXDSAGE days"
+    eval $TIMEOUT dq2-set-replica-metadata ${DSETSCOPE}:${JOBDSET} $JOBDSETLOC lifetime "$MAXDSAGE day"
+    echo "Freezing dataset ${DSETSCOPE}:${JOBDSET}"
+    eval $TIMEOUT dq2-freeze-dataset ${DSETSCOPE}:${JOBDSET}
+else
+    echo "Cannot retrieve the dataset locations"
+    exit
+fi
+eval $TIMEOUT rucio download ${DSETSCOPE}:$JOBOUTFILE --dir ${JOBDSET}
+outgetrc=$?
+ls ${JOBDSET}
+if [ $outgetrc -eq 0 -a -s ${JOBDSET}/${DSETSCOPE}/${JOBOUTFILE} ] ; then
+    cd ${JOBDSET}/${DSETSCOPE}
+    tar xfz ${JOBOUTFILE}
+    ls
+    JOBOUTFILEDIR="`find * -maxdepth 0 -type d`"
+    for patt in $PATTERN; do
+        \mv ${JOBOUTFILEDIR}/$patt $OUTDIR 2>/dev/null
+    done
+    rm -rf ${JOBOUTFILE} ${JOBOUTFILEDIR}
+else
+    [ $outgetrc -eq 0 ] && outgetrc=10
+    echo "Failed to get $JOBOUTFILE"
+fi
+
+cd $CURDIR
+[ "$OUTDIR" != "$TEMPDIR/$JOBDSET" ] && rm -fr $TEMPDIR/$JOBDSET
+
+exit $outgetrc

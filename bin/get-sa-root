@@ -1,0 +1,7 @@
+#!/bin/sh
+
+SE=$1
+
+SAROOT="`ldapsearch -s sub -x -h atlas-bdii.cern.ch -p 2170 -b "mds-vo-name=local,o=grid" "(&(objectClass=GlueSATop)(GlueChunkKey=GlueSEUniqueID=$SE)(GlueSALocalID=$VO))" GlueSARoot | grep ^GlueSARoot | sed 's#GlueSARoot: ##g' | cut -d: -f 2-`"
+
+echo $SAROOT

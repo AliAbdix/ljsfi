@@ -1,0 +1,18 @@
+# Build the host list and the jdls
+
+buildHostList()
+{
+  HOSTFILE=$1
+  JDL=$2
+  [ "$HOSTFILE" = "" ] && HOSTFILE=$PWD/sites/hosts
+  [ "$JDL" = "" ]      && JDL=$TEMPLATEPATH/query.jdl
+  mkdir -p `dirname $HOSTFILE`
+
+  if [ ! -f $JDL ] ; then
+     echo "JDL query file $JDL not found"
+     return -1
+  fi
+
+  $LJSF_JOBLISTMATCH $CONFIGVO $JDL 2>&1 | grep -e 2119 -e 8443 \
+                     | sort -r | uniq -w 15| awk '{print $1}' > $HOSTFILE
+}

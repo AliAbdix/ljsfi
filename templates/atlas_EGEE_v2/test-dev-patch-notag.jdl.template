@@ -1,0 +1,9 @@
+Executable = "sw-mgr";
+InputSandbox = {"@SCRIPTPATH@/sw-mgr","@SCRIPTPATH@/lcg-tags"};
+OutputSandbox = {"stdout", "stderr", "install.xml"};
+stdoutput = "stdout";
+stderror = "stderr";
+Arguments = "--test @RELNAME@ -l @LOGICALPATH@/@RELMAIN@ -p @PHYSICALPATH@/@VERSIONAREA@ -P @SWNAME@ -T patch -t @ARCH@ -O opt --require-prj @REQUIREDPRJ@ --host @TAGHOST@ --vo atlas --no-tag -m @PACMANVERSION@ --xml install.xml --site-config $VO_ATLAS_SW_DIR/AtlasSiteConfig.sh @KVPOST@ @DBRELEASE@";
+Environment = {"LCG_CATALOG_TYPE=@LCGCATALOGTYPE@","LFC_HOST=@LFCHOST@"};
+VirtualOrganisation = "atlas";
+Requirements = other.GlueCEUniqueId=="@SITE_CS@";

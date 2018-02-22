@@ -1,0 +1,210 @@
+#!/bin/sh
+showhelp()
+{
+  echo "Usage: `basename $0` [OPTIONS]"
+  echo "       OPTIONS:"
+  echo "          -a|--api              Use the AGIS API interface."
+  echo "          -g|--grid <name>      Specify the grid name to check."
+  echo "          -h|--help             Show this help."
+  echo "          -r|--resource <name>  Specify Panda resource to check."
+  echo "          -s|--sitename         Specify the site name to check."
+  echo "          -t|--trial            Perform a trial run."
+  echo "          -T|--threads <num>    Use <num> threads (Default: $MAXTHREADS)."
+  echo "          -v|--verbose          Increase verbosity."
+  exit 0
+}
+
+timeout () {
+    perl -e 'alarm shift; exec @ARGV' "$@";
+}
+
+# Defaults
+CHECKGRID="EGEE,OSG,ARC"
+[ -z "$MAXTHREADS" ] && MAXTHREADS=1
+
+OPTS=`getopt -o hag:r:s:tT:v -l help,api,grid:,resource:,sitename:,threads:,trial,verbose -- "$@"`
+if [ $? != 0 ] ; then echo "Terminating..."; exit -1 ; fi
+eval set -- "$OPTS"
+while true ; do
+        case "$1" in
+                -a|--api)          AGISAPI="--api"; shift;;
+                -g|--grid)         CHECKGRID="$2"; shift 2;;
+                -h|--help)         showhelp; shift;;
+                -r|--resource)     RESNAME="$2"; shift 2;;
+                -s|--sitename)     SITEOPT="--sitename=$2"; shift 2;;
+                -t|--trial)        TRIAL="y"; shift;;
+                -T|--threads)      MAXTHREADS="$2"; shift 2;;
+                -v|--verbose)      VERBOSE="yes"; shift;;
+                --)                shift ; break ;;
+                \?)                break ;
+                exit ;;
+        esac
+done
+
+AGISRES="/tmp/ljsf.$$.agis.resources"
+LJSFRES="/tmp/ljsf.$$.ljsf.resources"
+ALLRES="/tmp/ljsf.$$.all.resources"
+AGISRESTAGS="/tmp/ljsf.$$.agis.restags"
+LJSFRESTAGS="/tmp/ljsf.$$.ljsf.restags"
+ALLRESTAGS="/tmp/ljsf.$$.all.restags"
+SITEINFO="/tmp/ljsf.$$.siteinfo"
+TIMEOUT="timeout 200"
+
+# Check the proxy status
+check-proxy
+[ $? -ne 0 ] && exit 1
+
+rm -f $AGISRES
+if [ -z "$RESNAME" ] ; then
+    echo "Listing the AGIS resources"
+    ljsf-infosys --list-resource --status \!offline --type analysis --flavor $CHECKGRID > ${AGISRES}.analysis
+    ljsf-infosys --list-resource --status \!offline --type production --flavor $CHECKGRID > ${AGISRES}.production
+    cat ${AGISRES}.analysis ${AGISRES}.production | sort | uniq > ${AGISRES}
+    rm -f ${AGISRES}.analysis ${AGISRES}.production
+    echo "Getting the resource tags from LJSFi"
+    $TIMEOUT ljsfinfo.py --select="DISTINCT(site.cs)" --facility=Panda $SITEOPT --quiet | sed 's/"//g' | sort | uniq > $LJSFRES
+else
+    RESNAME="`echo $RESNAME | sed 's/[%\*]/.*/g'`"
+    ljsf-infosys --list-resource --status \!offline --type analysis --flavor $CHECKGRID | grep ^${RESNAME}$ > ${AGISRES}.analysis
+    ljsf-infosys --list-resource --status \!offline --type production --flavor $CHECKGRID | grep ^${RESNAME}$ > ${AGISRES}.production
+    cat ${AGISRES}.analysis ${AGISRES}.production | sort | uniq > ${AGISRES}
+    rm -f ${AGISRES}.analysis ${AGISRES}.production
+    $TIMEOUT ljsfinfo.py --select="DISTINCT(site.cs)" --facility=Panda $SITEOPT --quiet | sed 's/"//g' | sort | uniq | grep ^${RESNAME}$ > ${LJSFRES}
+    #echo $RESNAME > ${AGISRES}
+    #echo $RESNAME > ${LJSFRES}
+fi
+NUMAGISRES="`cat $AGISRES | wc -l`"
+echo "Number of AGIS resources: $NUMAGISRES"
+NUMLJSFRES="`cat $LJSFRES | wc -l`"
+echo "Number of LJSF resources: $NUMLJSFRES"
+echo "Caching AGIS tags"
+AGISRESINDX=0
+cat $AGISRES | while read RES; do
+    AGISRESINDX=$((AGISRESINDX+1))
+    PERCDONE=$((100*AGISRESINDX/NUMAGISRES))
+    echo "Caching AGIS tags for $RES [$PERCDONE%]"
+    agis-tags --list -R $RES $AGISAPI > ${AGISRESTAGS}.${RES}
+    if [ ! -s ${AGISRESTAGS}.${RES} ] ; then
+        echo "No AGIS tags for $RES"
+        touch ${AGISRESTAGS}.${RES}
+    fi
+done
+echo "Caching LJSFi tags"
+LJSFRESINDX=0
+cat $LJSFRES | while read RES; do
+    LJSFRESINDX=$((LJSFRESINDX+1))
+    PERCDONE=$((100*LJSFRESINDX/NUMLJSFRES))
+    echo "Caching LJSF tags for $RES [$PERCDONE%]"
+    ljsfinfo.py --select=release_data.tag --status=installed --cs=$RES --quiet | sed 's/"//g' | sort | uniq > ${LJSFRESTAGS}.${RES}
+    if [ $? -ne 0 ] ; then
+        echo "Error getting LJSFi tags"
+        exit 100
+    fi
+    if [ ! -s ${LJSFRESTAGS}.${RES} ] ; then
+        echo "No LJSFi tags for $RES"
+        touch ${LJSFRESTAGS}.${RES}
+    fi
+done
+echo "Merging tags"
+#cat $AGISRES $LJSFRES | sort | uniq | grep -v '^\s*$' > ${ALLRES}
+cat $AGISRES | sort | uniq | grep -v '^\s*$' > ${ALLRES}
+NUMALLRES="`cat ${ALLRES} | wc -l`"
+cat $ALLRES | while read RES; do
+    echo -n "Merging `cat ${AGISRESTAGS}.${RES} | wc -l` AGIS tags in ${AGISRESTAGS}.${RES} with `cat ${LJSFRESTAGS}.${RES} | wc -l` LJSFi tags in ${LJSFRESTAGS}.${RES}. Total count = "
+    cat ${AGISRESTAGS}.${RES} ${LJSFRESTAGS}.${RES} 2>/dev/null | sort | uniq | grep -v '^\s*$' | grep -v '^VO-atlas-poolcond$' > ${ALLRESTAGS}.${RES}
+    echo "`cat ${ALLRESTAGS}.${RES} | wc -l` tags in ${ALLRESTAGS}.${RES}"
+done
+echo "Checking missing tags in LJSF"
+ALLRESINDX=0
+cat $ALLRES  | while read RES; do
+    ALLRESINDX=$((ALLRESINDX+1))
+    PERCDONE=$((100*ALLRESINDX/NUMALLRES))
+    NJOBS=`jobs -p | wc -l`
+    while [ $NJOBS -ge $MAXTHREADS ] ; do
+        [ -z "$OUTSENT" ] && echo "Jobs running = $NJOBS => waiting"
+        sleep 5s
+        OUTSENT="y"
+        NJOBS=`jobs -p | wc -l`
+    done
+    unset OUTSENT
+    echo "Checking resource $ALLRESINDX - $RES [$PERCDONE% done]"
+    (
+        if [ -s ${ALLRESTAGS}.${RES} ] ; then
+            if [ ! -s ${LJSFRESTAGS}.${RES} ] ; then
+                echo "No LJSFi tags found for ${RES} in file ${LJSFRESTAGS}.${RES}"
+            fi
+            grep -v -f ${LJSFRESTAGS}.${RES} ${ALLRESTAGS}.${RES} | while read TAG; do
+                RELNAME="`ljsfinfo.py --reltag=$TAG --show-relname --quiet --cache --cache-timeout 7200 | sed 's/\"//g'`"
+                MSG="[LJSFi] Missing tag $TAG in $RES."
+                if [ -n "$RELNAME" ] ; then
+                    TAGTASK="validation"
+                    REQINFO="`ljsfreq.py --query --reqtype=$TAGTASK --cs=$RES --rel=$RELNAME | cut -d, -f 1,8`"
+                    REQID="`echo $REQINFO | cut -d, -f 1`"
+                    REQSTAT="`echo $REQINFO | cut -d, -f 2`"
+                    ljsf-infosys --info --panda-resource $RES --cache --cache-timeout 7200 &> ${SITEINFO}.${RES}
+                    GOCNAME="`cat ${SITEINFO}.${RES} | grep '^ATLAS_SITENAME=' | tail -n 1 | cut -d= -f 2`"
+                    SITENAME="`cat ${SITEINFO}.${RES} | grep '^SITENAME=' | tail -n 1 | cut -d= -f 2`"
+                    GNAME="`cat ${SITEINFO}.${RES} | grep '^GRID=' | tail -n 1 | cut -d= -f 2`"
+                    CORECOUNT="`cat ${SITEINFO}.${RES} | grep '^CORECOUNT=' | tail -n 1 | cut -d= -f 2`"
+                    [ -z "$GOCNAME" ] && GOCNAME=$SITENAME
+                    if [ -z "$CORECOUNT" ] ; then
+                        echo "Warning corecount is null, using 1"
+                        CORECOUNT=1
+                    fi
+                    if [ -n "$REQID" ] ; then
+                        if [ "$REQSTAT" == "autorun" -o "$REQSTAT" == "accepted" -o "$REQSTAT" == "aborting" ] ; then
+                            echo "$MSG Task $TAGTASK of release $RELNAME still active"
+                        else
+                            echo "$MSG Restarting task $TAGTASK of release $RELNAME (status: $REQSTAT)"
+                            if [ "$TRIAL" == "y" ] ; then
+                                echo ljsfreq.py --update --reqid=\"$REQID\" --status=autorun --comments=\"Restarting\"
+                            else
+                                ljsfreq.py --update --reqid="$REQID" --status=autorun --comments="Restarting"
+                            fi
+                        fi
+                    else
+                        echo "$MSG Starting $TAGTASK task of release $RELNAME in resource $RES"
+                        if [ "$TRIAL" == "y" ] ; then
+                            echo ljsfreq.py --cs=$RES --rel=$RELNAME --reqtype=$TAGTASK --atlas-sitename=$ATLAS_SITENAME --sitename=$SITENAME --status=autorun --grid-name=$GNAME --comments=\"$TAGTASK\"
+                            echo agis-tags --remove --rel=$RELNAME -R $RES $AGISAPI
+                        else
+                            if [ $CORECOUNT -gt 1 ] ; then
+                                # Multicore resources
+                                ljsfreq.py --cs=$RES --rel=$RELNAME --reqtype=$TAGTASK --atlas-sitename=$ATLAS_SITENAME --sitename=$SITENAME --status=done --grid-name=$GNAME --comments="$TAGTASK"
+                                ljsfinfo.py --rel=$RELNAME --cs=$RES --status=installed
+                                agis-tags --add --rel=$RELNAME -R $RES $AGISAPI 2> /dev/null
+                            else
+                                ljsfreq.py --cs=$RES --rel=$RELNAME --reqtype=$TAGTASK --atlas-sitename=$ATLAS_SITENAME --sitename=$SITENAME --status=autorun --grid-name=$GNAME --comments="$TAGTASK"
+                                agis-tags --remove --rel=$RELNAME -R $RES $AGISAPI 2> /dev/null
+                            fi
+                        fi
+                    fi
+                else
+                    echo "$MSG No release name found for tag."
+                fi
+            done
+            if [ ! -s ${AGISRESTAGS}.${RES} ] ; then
+                echo "No AGIS tags found for ${RES} in file ${AGISRESTAGS}.${RES}"
+            fi
+            grep -v -f ${AGISRESTAGS}.${RES} ${ALLRESTAGS}.${RES} | while read TAG; do
+                RELNAME="`ljsfinfo.py --reltag=$TAG --show-relname --quiet --cache --cache-timeout 7200 | sed 's/\"//g'`"
+                echo "[AGIS] Missing tag $TAG in $RES. Tagging."
+                if [ "$TRIAL" == "y" ] ; then
+                    echo agis-tags --panda-resource="$RES" --add --rel="$RELNAME" $AGISAPI
+                else
+                    agis-tags --panda-resource="$RES" --add --rel="$RELNAME" $AGISAPI
+                fi
+            done
+        fi
+    ) &
+    [ $ALLRESINDX -eq $NUMALLRES ] && wait
+done
+
+
+echo "ALL DONE"
+
+# Cleanup
+rm -f ${AGISRES} ${LJSFRES} ${ALLRES}
+rm -f ${AGISRESTAGS}* ${LJSFRESTAGS}* ${ALLRESTAGS}*
+rm -f ${SITEINFO}.*
+exit

@@ -1,0 +1,47 @@
+<title>Cache files</title>
+<body background="sky.gif">
+<p>
+<h1><font color=navy>Cache lists</font></h1>
+<p>
+<hr size=5>
+<p>
+    A cache list is simply a file with suffix ".caches" that contains a list
+of caches.  For instance, in a fresh directory, create a file <b>test.caches</b>
+<pre><b><font color="#8B0000">#
+#  -- My test cache list
+#
+BU
+Pacman
+</font></pre></b>
+This lists two caches by their symbolic names, but they may be URLs or 
+paths in your local file system, or SSH access strings, etc.  It's just the
+same format that you specify a cache with on the command line.  Now do
+<pre><b><font color="#8B0000">% pacman -allow trust-all-caches
+% pacman -lc test.caches
+</font></pre></b>
+Caches files thus let you group caches together and make hierarchies.  Suppose,
+now, that you want to install a version of Python.  First do
+<pre><b><font color="#8B0000">% pacman -d version -lc test.caches
+</font></pre></b>
+to see the available versions.  Then, to install version 2.2.3 for instance, just do
+<pre><b><font color="#8B0000">% pacman -get "test.caches:Python | version('2.2.3')"
+</font></pre></b>
+Notice that there is a Python version 2.2.3 in both BU and Pacman.  Pacman always 
+takes the first package that meets the requirements in your list of caches.  To 
+confirm this, do
+<pre><b><font color="#8B0000">% pacman -l -d up
+</font></pre></b>
+to see that the package updates from <b>test.caches:BU</b>.  If you like, you can
+also specify a path through a hierarchy of caches to specify what you want.  For example, 
+if you want the Pacman cache copy of Python, do
+<pre><b><font color="#8B0000">% pacman -remove
+% pacman -fetch test.caches:Pacman:Python
+% pacman -l
+</font></pre></b>
+and you'll see that you get one of the Python packages from the Pacman cache rather
+than the BU cache.
+<p>
+<hr size=5>
+<h3><a href="http://physics.bu.edu/pacman/" target="_blank">Pacman Headquarters</a></h3>
+<p>
+</body>

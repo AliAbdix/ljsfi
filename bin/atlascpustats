@@ -1,0 +1,58 @@
+#!/bin/sh
+
+# Script to get info on CPU number for sites in a BDII (default: Atlas BDII)
+# A. De Salvo - 03-08-2004
+
+source $CONFPATH/install.conf
+
+RELEASE=$1
+[ "$RELEASE" == "" ] && RELEASE="11.0.1"
+SWPROJECT="`echo ${SWNAME} | tr [A-Z] [a-z] | sed 's#^atlas##g'`"
+ATLASRELEASETAG="VO-atlas-${SWPROJECT}-${RELEASE}"
+TMPFILE=tmp-cpustats.$$
+OUTFILE=out-cpustats.$$
+HSTFILE=hst-cpustats.$$
+SVCFILE=svc-cpustats.$$
+
+# Query the BDII
+  ldapsearch -s sub -x -h $ATLAS_BDII -p 2170 -b "mds-vo-name=local,o=grid" "(&(objectClass=GlueClusterTop)(GlueHostApplicationSoftwareRunTimeEnvironment=$ATLASRELEASETAG))" GlueSubClusterName | egrep '^GlueSubClusterName' | awk '{print $2}' > $HSTFILE
+cat $HSTFILE | while read hst; do
+  ldapsearch -s sub -x -h $ATLAS_BDII -p 2170 -b "mds-vo-name=local,o=grid" "(&(objectClass=GlueCE)(GlueCEInfoHostName=$hst))" GlueCEInfoHostName GlueCEInfoTotalCPUs GlueCEStateFreeCPUs | egrep '^GlueCEInfoHostName|^GlueCEInfoTotalCPUs|^GlueCEStateFreeCPUs' >> $TMPFILE
+done
+
+# Parse the results of the query
+let count=0
+outstr=""
+cat $TMPFILE | while read line ; do
+  let count+=1
+  VALUE=`echo $line | cut -d: -f 2`
+  if [ $count -le 3 ] ; then
+    outstr="$outstr $VALUE"
+  else
+    printf "| %-35s | %8d | %9d |\n" $outstr >> $OUTFILE
+    outstr="$VALUE"
+    let count=1
+  fi
+done
+
+# Print out the results and the totals
+echo "Statistics for release $RELEASE"
+echo "=============================================================="
+echo "| Site name                           | Tot CPUs | Free CPUs |"
+echo "|-------------------------------------|----------|-----------|"
+cat $OUTFILE | sort | uniq -w 37 > $SVCFILE
+cat $SVCFILE
+echo "|-------------------------------------|----------|-----------|"
+cat $SVCFILE | awk 'BEGIN { sumsites=0; sumtot=0; sumfree=0 } \
+                          { sumsites+=1; sumtot+=$4; sumfree+=$6; } \
+    END {\
+         p=sumfree/sumtot*100;\
+         printf "| Totals: %27d | %8d | %9d |\n", sumsites, sumtot, sumfree;\
+         printf "|                                     |          | (%5.1f %) |\n", p;\
+    }'
+echo "=============================================================="
+
+# Remove the temporary files
+rm -f $TMPFILE $OUTFILE $HSTFILE $SVCFILE
+
+exit

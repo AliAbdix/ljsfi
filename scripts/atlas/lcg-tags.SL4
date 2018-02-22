@@ -1,0 +1,470 @@
+#!/usr/bin/perl
+######################################################################
+#
+# Tool to manage experiment tags
+#
+# Author: Andrea Sciaba' <Andrea.Sciaba@cern.ch>
+#
+# Version: 0.2.3
+#
+# History:
+# - 0.2.3: no more temp files left around, some globus error messages
+#          suppressed
+# - 0.2.2: improved error messages; fixed file permissions if pool accounts
+#          are used
+# - 0.2.1: added '.' to the list of allowrd characters in tags
+# - 0.2.0: added the possibility to extract the VO from the proxy or from
+#          LCG_GFAL_VO; extended allowed character set in tags; retry
+#          mechanism for new tag upload with dump to a file if failed 3
+#          times; better cleanup of temporary files
+# - 0.1.0 : First version
+######################################################################
+
+use Getopt::Long;
+use Pod::Usage;
+use File::Temp qw/tempfile mktemp/;
+
+$NAME='lcg-tags';
+
+GetOptions(
+	   'help'      => \$help,
+	   'ce=s'      => \$ce,
+	   'vo=s'      => \$vo,
+	   'tags=s'    => \@tags,
+	   'tagfile=s' => \$tagfile,
+	   'add'       => \$add,
+	   'replace'   => \$replace,
+	   'remove'    => \$remove,
+	   'clean'     => \$clean,
+	   'verbose'   => \$verbose,
+	   'list'      => \$list
+	   ) or pod2usage("Syntax error.");
+pod2usage(-verbose => 2) if $help;
+pod2usage("Syntax error.") if (@ARGV > 0);
+
+if (!$ce) { die "$NAME: error: CE host name not specified.\n" };
+$vo = &find_vo if (!$vo);
+if (!$vo) {
+    die "$NAME: error: could not find VO name in command line, in proxy or in LCG_GFAL_VO.\n";
+}
+if ($add+$replace+$remove+$clean+$list != 1) {
+    die "$NAME: error: use --add, --replace, --remove, --clean or --list.\n";
+}
+if (($add || $replace || $remove) && !(@tags || $tagfile)) { die "$NAME: error: list of tags not provided.\n" };
+
+@tags = split(/,/, join(',', @tags));
+if ($tagfile) {
+    push @tags, &read_tagfile($tagfile);
+}
+
+&check_proxy;
+&check_tags(@tags);
+
+$edgvar = &remotepath($ce);
+die "$NAME: error: could not locate EDG_LOCATION_VAR on CE.\n" if (!$edgvar);
+
+&addtags if ($add || $replace);
+&removetags if ($remove);
+&cleantags if ($clean);
+&listtags if ($list);
+
+exit 0;
+
+sub find_vo {
+    $cmd = "voms-proxy-info -vo 2> /dev/null | head -1 ";
+    my $vo = `$cmd`;
+    chomp $vo;
+    if (!$vo) {
+	$vo = $ENV{"LCG_GFAL_VO"};
+    }
+    return $vo;
+}
+
+sub check_proxy {
+    my $cmd = "grid-proxy-info -exists 2> /dev/null";
+    if (system("$cmd")) {
+	die "$NAME: error: could not find a valid proxy.\n";
+    }
+}
+
+sub read_tagfile {
+    my $tagfile = shift;
+    open(TAGS, "$tagfile") or die "$NAME: error: tag file $tagfile does not exist.\n";
+    my @list = <TAGS>;
+    my @tags = grep { /.+/ } map { split /\s+/ } @list;
+    close TAGS;
+    return @tags;
+}
+    
+sub addtags {
+    my @oldtags = ();
+    @oldtags = &read_tags($ce, $vo, $edgvar) if ($add);
+    my @newtags = sort(&remove_dup(@oldtags, @tags));
+    if (@newtags > @oldtags) {
+	&write_tags($ce, $vo, $edgvar, @newtags);
+    } else {
+	warn "$NAME: warning: tags already present.\n";
+    }
+}
+
+sub removetags {
+    my @oldtags = &read_tags($ce, $vo, $edgvar);
+    my @newtags = ();
+    foreach my $o (@oldtags) {
+	push(@newtags, $o) if (!grep($o eq $_, @tags));
+    }
+    if (@newtags < @oldtags) {
+	&write_tags($ce, $vo, $edgvar, @newtags);
+    } else {
+	warn "$NAME: warning: no tags to remove.\n";
+    }
+}
+
+sub cleantags {
+    &write_tags($ce, $vo, $edgvar, ());
+}
+
+sub listtags {
+    my @oldtags = &read_tags($ce, $vo, $edgvar);
+    foreach (@oldtags) {
+        print "$_\n";
+    }
+}
+
+sub remotepath {
+    my $ce = shift;
+    my $edgvar = '';
+    my $temp = mktemp("/tmp/lcg-tagsXXXXXX");
+    my $sysedg = "gsiftp://$ce/etc/sysconfig/edg";
+    my $cmd = `globus-url-copy $sysedg file://$temp 2>&1`;
+    if ($cmd) {
+	unlink $temp;
+	die "$NAME: error: cannot download /etc/sysconfig/edg from CE.\n" .
+	    "$NAME: error: " . &guc_error($cmd, $verbose) . "\n";
+    }
+    open(TMP, "$temp") or die "$NAME: error: cannot open file $temp.\n";
+    while (<TMP>) {
+	chomp;
+	my ($key, $value) = split /=/, $_;
+	if ($key eq 'EDG_LOCATION_VAR') {
+	    $edgvar = $value;
+	    last;
+	} elsif ($key eq 'EDG_LOCATION') {
+	    $edgvar = "$value/var";
+	}
+    }
+    close TMP;
+    unlink $temp;
+    return $edgvar;
+}
+
+sub check_tags {
+    my @tags = @_;
+    foreach (@tags) {
+	if (/[^\w\.\-_:\/]/) {
+	    die "$NAME: error: illegal character in tag name $_.\n";
+	} elsif (!/^VO-$vo-\w+/) {
+	    die "$NAME: error: illegal tag syntax: use VO-<voname>-<text>.\n";
+	}
+    }
+}
+
+sub read_tags {
+    my $ce     = shift;
+    my $vo     = shift;
+    my $edgvar = shift;
+    my @tags = ();
+    my $temp = mktemp("/tmp/lcg-tagsXXXXXX");
+    my $listfile = "gsiftp://$ce$edgvar/info/$vo/$vo.list";
+    my $cmd = "globus-url-copy $listfile file://$temp";
+    if (system("$cmd")) {
+	warn "$NAME: warning: failed to download $listfile.\nMaybe it does not exist.\n";
+	unlink $temp;
+	return @tags;
+    }
+    open(TMP, "$temp") or die "$NAME: error: cannot open file $temp.\n";
+    my @list = <TMP>;
+    @tags = grep { /.+/ } map { split /\s+/ } @list;
+    close TMP;
+    unlink $temp;
+    return sort @tags;
+}
+
+sub write_tags {
+    my $ce     = shift;
+    my $vo     = shift;
+    my $edgvar = shift;
+    my @tags   = @_;
+    my ($fh, $temp) = tempfile()
+	or die "$NAME: error: cannot create file $temp.\n";
+    foreach (@tags) {
+	print $fh "$_\n";
+    }
+    close $fh;
+    my $ret = &lock_file($ce, $vo, $edgvar);
+    if ($ret) {
+	unlink $temp;
+	die "$NAME: error: cannot create remote lockfile.\n"
+	}
+    my $listfile = "gsiftp://$ce$edgvar/info/$vo/$vo.list";
+    my $cmd = "globus-url-copy file://$temp $listfile 2>/dev/null";
+    my $retries = 0;
+    while (system("$cmd") && $retries < 3) {
+	sleep 10;
+	$retries++;
+    }
+    if ($retries == 3) {
+	system("mv -f $temp failed.tags");
+	warn "$NAME: error: new tag upload failed. New tags dumped in failed.tags\n";
+    } else {
+	if ( &is_poolaccount(&whoami("$ce")) ) {
+	    &fix_perm($ce, "$edgvar/info/$vo", "0775");
+	    &fix_perm($ce, "$edgvar/info/$vo/$vo.list", "0664");
+	}
+    }
+    &unlock_file($ce, $vo, $edgvar);
+    unlink $temp if (-e $temp);
+}
+
+sub lock_file {
+    my $ce     = shift;
+    my $vo     = shift;
+    my $edgvar = shift;
+    my $lockfile = "gsiftp://$ce$edgvar/info/$vo/lock";
+    my $temp = mktemp("/tmp/lcg-tagsXXXXXX");
+    my $cmd = "globus-url-copy $lockfile file://$temp 2>/dev/null";
+
+# Exit with error status if could get a lock file
+    if (!system("$cmd")) {
+	unlink $temp;
+	warn "$NAME: error: lock file already present.\n";
+	return 1;
+    }
+    unlink $temp;
+    my ($fh, $temp) = tempfile();
+    if (!defined $fh) {
+	    warn "$NAME: error: cannot create file $temp.\n";
+	    return 1;
+	};
+    my $name = getlogin() || (getpwuid($<))[0];
+    my $ip = `hostname -i`;
+    my @date = gmtime(time);
+    my $year = $date[5]+1900;
+    my $date = "$date[3]-$date[4]-$year $date[2]:$date[1]:$date[0]";
+    print $fh <<"EOF";
+Lock file generated by $name from $ip at $date.
+EOF
+    close $fh;
+
+# Create lock file in CE and die if fails
+    my $cmd = `globus-url-copy file://$temp $lockfile 2>&1`;
+    unlink $temp;
+    if ($cmd) {
+	warn "$NAME: error: " . &guc_error($cmd, $verbose) . "\n";
+	return 1;
+    }
+    return 0;
+}
+
+sub unlock_file {
+    my $ce     = shift;
+    my $vo     = shift;
+    my $edgvar = shift;
+    my $lockfile = "gsiftp://$ce$edgvar/info/$vo/lock";
+    my $cmd = "edg-gridftp-rm $lockfile";
+    if (system("$cmd")) {
+	die "$NAME: error: cannot unlock the tag file.\n";
+    }
+}
+
+sub remove_dup {
+    my @a;
+    foreach my $i ( @_ ) {
+	my $is = 0;
+	foreach my $j ( @a ) {
+	    $is = 1 if $i eq $j;
+	}
+	push (@a, $i) if not $is;
+    }
+    return @a;
+}
+
+sub guc_error {
+    my $reason = shift;
+    my $verbosity = shift;
+    my %Reasons = (
+		   'globus_libc_gethostbyname_r failed' =>
+		   'The CE does not exist',
+		   'globus_libc_gethostbyaddr_r failed' =>
+		   'The CE does not exist',
+		   'LCMAPS credential mapping NOT successful' =>
+		   'you are not authorized on the CE.',
+		   'Permission denied' =>
+		   'you do not have the privileges to read',
+		   'No such file or directory' =>
+		   'no such file or directory',
+		   'not a plain file' =>
+		   'the file does not exist'
+		   );
+    my $code = $reason;
+    foreach ( keys %Reasons ) {
+        if ( $code =~ /$_/ ) {
+            $code = $Reasons{$_};
+        }
+    }
+    $code = $code . "\n" . $reason if ( $verbosity && $code ne $reason );
+    return $code;
+}
+
+sub fix_perm {
+    my $node = shift;
+    my $file = shift;
+    my $perm = shift;
+
+    my $cmd = "uberftp $node \'chmod $perm $file\' > /dev/null 2>&1";
+    return system("$cmd");
+}
+
+sub whoami {
+    my $node = shift;
+    my $user = '';
+    my $cmd = "uberftp $node bye";
+    my @output = `$cmd`;
+    foreach (@output) {
+	$user = $1 if ( /User (.+) logged in/ );
+    }
+    return $user;
+}
+
+sub is_poolaccount {
+    my $user = shift;
+    return $user =~ /\d+$/;
+}    
+
+__END__
+
+=pod
+
+=head1 NAME
+
+lcg-tags - manage experiment tags
+
+=head1 SYNOPSIS
+
+Add tags:
+
+B<lcg-tags> --ce I<cehost> --vo I<voname> --add --tags I<tags> --tagfile I<tagfile>
+
+Replace tags:
+
+B<lcg-tags> --ce I<cehost> --vo I<voname> --replace --tags I<tags> --tagfile I<tagfile>
+
+Remove tags:
+
+B<lcg-tags> --ce I<cehost> --vo I<voname> --remove --tags I<tags> --tagfile I<tagfile>
+
+Clean tags:
+
+B<lcg-tags> --ce I<cehost> --vo I<voname> --clean
+
+List tags:
+
+B<lcg-tags> --ce I<cehost> --vo I<voname> --list
+
+Prints help:
+
+B<lcg-tags> --help
+
+=head1 DESCRIPTION
+
+This command allows an experiment software manager (ESM) to change the values
+of the GlueHostApplicationSoftwareRunTimeEnvironment attribute for a selected
+Computing Element and his Virtual Organisation. The ESM must have a valid
+VOMS proxy with the proper role.
+
+=head1 OPTIONS
+
+=head2 General options
+
+=over 8
+
+=item B<--ce> I<cehost>
+
+Specifies the host name of the Computing Element head node.
+
+=item B<--vo> I<voname>
+
+Specifies the name of the Virtual Organisation. If not specified, the
+command tries to extract the VO from the user proxy certificate, or from the
+value of the environment variable LCG_GFAL_VO.
+
+=back
+
+
+=head2 Actions
+
+=over 8
+
+=item B<--add>
+
+Adds the specified tags to the existing tags.
+
+=item B<--replace>
+
+Replaces the existing tags with the specified tags.
+
+=item B<--remove>
+
+Removes the specified tags from the existing tags.
+
+=item B<--clean>
+
+Deletes all the existing tags.
+
+=item B<--list>
+
+Prints the existing tags.
+
+=item B<--help>
+
+Prints this help.
+
+=back
+
+=head2 Tags
+
+Tags must follow this syntax:
+
+VO-I<voname>-I<text>
+
+where I<voname> is the name of the Virtual Organisation and I<text> is
+an arbitrary string containing only letters, numbers and the characters .-_/:.
+Tags can be specified by the following options:
+
+=over 8
+
+=item B<--tags> I<tag1,tag2,...>
+
+Specifies the tags to be added or removed as a comma-delimited list
+(no spaces allowed). Multiple --tags options can be given.
+
+=item B<--tagfile> I<tagfile>
+
+Specifies a file containing a list of tags to be added or removed. The
+tags can be separated by any number of spaces, tabs and newlines.
+
+=back
+
+=head1 KNOWN BUGS
+
+None.
+
+=head1 AUTHOR
+
+Written by Andrea Sciaba.
+
+=head1 REPORTING BUGS
+
+Submit bugs to <Andrea.Sciaba@cern.ch>.
+
+=cut

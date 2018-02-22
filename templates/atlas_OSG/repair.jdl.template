@@ -1,0 +1,9 @@
+Executable = "gbb";
+InputSandbox = {"@SCRIPTPATH@/repair.sh","@SCRIPTPATH@/gbb"};
+OutputSandbox = {"stdout","stderr"};
+stdoutput = "stdout";
+stderror = "stderr";
+Arguments = "--timing -v -m 300 -p -D 600 -s @GBB_SURL@ -c 1 $PWD/repair.sh RELEASE";
+Environment = {"arch=@ARCH@","relarch=@RELARCH@","platform=@PACMANPLATFORM@","PACMAN_VER=@PACMANVERSION@","LCG_CATALOG_TYPE=@LCGCATALOGTYPE@","LFC_HOST=@LFCHOST@","VERAREA=@VERSIONAREA@","ATLAS_COMPILER=ATLASCOMPILER"};
+VirtualOrganisation = "atlas";
+Requirements = other.GlueCEUniqueId=="@SITE_CS@";

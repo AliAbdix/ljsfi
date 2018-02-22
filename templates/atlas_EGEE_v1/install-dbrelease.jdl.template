@@ -1,0 +1,9 @@
+Executable = "gbb";
+InputSandbox = {"SCRIPTPATH/install-dbrelease.sh","SCRIPTPATH/gbb"};
+OutputSandbox = {"stdout", "stderr"};
+stdoutput = "stdout";
+stderror = "stderr";
+Arguments = "--timing -v -m 300 -p -D 600 -s GBB_SURL -c 1 ./install-dbrelease.sh RELEASE DB_REL CENAME";
+Environment = {"PACMAN_VER=PACMANVERSION","LCG_CATALOG_TYPE=LCGCATALOGTYPE","LFC_HOST=LFCHOST"};
+VirtualOrganisation = "atlas";
+Requirements = other.GlueCEUniqueId=="CEID";

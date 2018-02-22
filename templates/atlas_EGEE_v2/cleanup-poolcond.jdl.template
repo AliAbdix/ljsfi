@@ -1,0 +1,8 @@
+Executable = "sw-mgr";
+InputSandbox = {"@SCRIPTPATH@/sw-mgr","@SCRIPTPATH@/lcg-tags"};
+OutputSandbox = {"stdout", "stderr", "install.xml"};
+stdoutput = "stdout";
+stderror = "stderr";
+Arguments = "-C @RELNAME@ -p @PHYSICALPATH@ -T poolcond --remove-tags --grid-name @GRIDNAME@ --host @TAGHOST@ --subcluster @SCNAME@ --vo atlas --tags @RELTAG@ --xml install.xml --site-config $VO_ATLAS_SW_DIR/AtlasSiteConfig.sh --dump-tags $VO_ATLAS_SW_DIR/tags --local-config $VO_ATLAS_SW_DIR/local --clean-links";
+VirtualOrganisation = "atlas";
+Requirements = other.GlueCEUniqueId=="@SITE_CS@";

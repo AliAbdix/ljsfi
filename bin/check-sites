@@ -1,0 +1,33 @@
+#!/bin/sh
+
+source $CONFPATH/install.conf
+source $BINPATH/build-host-list.def
+source $BINPATH/submit.def
+
+JDLQUERY=$TEMPLATEPATH/query.jdl
+JDLTEMPLATE=$TEMPLATEPATH/check-sites.jdl.template
+SITESPATH=$PWD/sites
+SITESJDLPATH=$SITESPATH/jdl
+HOSTLIST=$SITESPATH/hosts
+
+# Build the host list and the jdls
+if [ "$1" != "-submit" ] ; then
+  buildHostList ${HOSTLIST} ${JDLQUERY}
+  if [ ! -f ${HOSTLIST} ] ; then
+    echo "Host list not created. Exiting..."
+    exit -1
+  fi
+fi
+
+mkdir -p $SITESJDLPATH
+while read line; do
+  CEQUEUE=${line}
+  CENAME=`echo ${CEQUEUE} | cut -d: -f 1 | sed 's/ //g'`
+  eval sed -e s#CEID#$CEQUEUE#g \
+           -e s#HOST#$CENAME#g \
+           -e s#SCRIPTPATH#$SCRIPTPATH# \
+           ${JDLTEMPLATE} > ${SITESJDLPATH}/${CENAME}.jdl
+  submitJDL ${SITESJDLPATH}/${CENAME}.jdl
+done < ${HOSTLIST}
+
+exit

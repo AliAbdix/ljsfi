@@ -1,0 +1,1046 @@
+#!/usr/bin/env python
+
+import getopt
+import os, sys
+import string
+import threading
+import select
+import time
+import stat
+import signal
+import popen2
+import commands
+import re
+import errno, stat
+try:
+    lcgpath = sys.path.append(os.environ["LCG_LOCATION"]+'/lib/python'+sys.version[0:3]+'/site-packages')
+    if (not lcgpath in sys.path): sys.path.append(lcgpath)
+    import gfal, lcg_util
+    __LCG__ = 1
+except:
+    __LCG__ = 0
+try: from gbbuser import *
+except: pass
+
+# Ensuring critical definitions
+def EnsureDefinition(name, definition, target=__builtins__.__dict__):
+    if not target.has_key(name):
+        exec definition in target
+
+# Check for True/False builtins
+EnsureDefinition('False','False = 0')
+EnsureDefinition('True','True = not False')
+
+#
+#########################################################
+# GRID BigBrother                                       #
+# Alessandro De Salvo <Alessandro.DeSalvo@roma1.infn.it #
+# v1.0 - 20090425                                       #
+#########################################################
+#
+
+__version__ = "$Revision: 1.0 $"[11:-1]
+__author__  = "Alessandro De Salvo <Alessandro.DeSalvo@roma1.infn.it>"
+
+HELP="""
+GriBB - Grid Big Brother %s.
+Usage: gbb [OPTIONS] <program name 1> <program name 2> ...
+
+Options:
+  -c|--cpu-limit=<cpu %%>       minimum cpu limit between two monitoring calls.
+                               If the process consumes less than the given
+                               amount of CPU time it will be killed.
+  -d|--debug                   print debug messages.
+  -D|--dump-interval=<seconds> partial output dump interval, in seconds.
+  -f|--force-dump              force immediate dump of partial output.
+  -h|--help                    display this help and exit.
+  -l|--time-limit=<seconds>    maximum running time for the process, in seconds.
+  -L|--tail                    always output the last partial fragment.
+  -M|--memory-limit=<MB>       maximum memory allocation for the process, in MB.
+  -m|--mon-interval=<seconds>  monitoring poll time, in seconds.
+  -o|--out-limit=<KB>          maximum output size, in KB.
+  -p|--partial                 periodically dump the partial output to <surl>.
+                               (to be used with the --surl option).
+  -s|--surl=<SURL>             use <SURL> to dump the partial output.
+  -t|--timing                  time the process to run and GBB used cpu.
+  -T|--temp-dir=<path>         use <path> to store temporary files.
+  -v|--verbose                 be verbose.
+  --ppid=<ppid>                monitor only the processes with parent pid <pid>.
+  --dbfile=<filename>          use <filename> to store the monitoring db data.
+                               [ current value: %s ]
+  --procmon                    enable extended process monitoring.
+  --report=<type>              provide a CSV report for <type>.
+                               <type> can be %s
+  --strace-file=<file>         use <file> as output for strace.
+                               [ current value: %s ]
+
+%s
+"""
+
+BANNER="""
+GBB> ############################################################
+GBB> # Grid Big Brother v%s starting.
+GBB> #    
+GBB> # %s
+GBB> ############################################################
+
+"""
+
+__PROXY_INFO__    = "voms-proxy-info -identity --dont-verify-ac 2>/dev/null"
+__PARTIALOUT__    = "%s/out.part"
+__PARTIALSTATS__  = "%s/stats.part"
+__CREATE_DB__     = [
+"""
+CREATE TABLE GBBprocData (
+             id         INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL
+            ,ppid       INTEGER NOT NULL
+            ,pid        INTEGER NOT NULL
+            ,cmd        VARCHAR(1024) NOT NULL
+            ,stime      DATE NOT NULL
+            ,user       VARCHAR(20) NOT NULL
+            )
+""","""
+CREATE TABLE GBBprocInfo (
+             id         INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL
+            ,procID     INTEGER NOT NULL
+            ,vsize      DOUBLE NOT NULL
+            ,rss        DOUBLE NOT NULL
+            ,cput       DOUBLE NOT NULL
+            ,real       DOUBLE NOT NULL
+            ,cpu        DOUBLE NOT NULL
+            ,conn       INTEGER DEFAULT 0
+            )
+""","""
+CREATE TABLE GBBnetMon (
+             id         INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL
+            ,real       DOUBLE NOT NULL
+            ,recv       DOUBLE NOT NULL
+            ,rrate      DOUBLE NOT NULL
+            ,send       DOUBLE NOT NULL
+            ,srate      DOUBLE NOT NULL
+            )
+"""
+]
+__INS_PROC_DATA__ = "INSERT INTO GBBprocData (ppid, pid, cmd, stime, user) VALUES (%d, %d, '%s', '%s', '%s')"
+__INS_PROC_INFO__ = "INSERT INTO GBBprocInfo (procID, vsize, rss, cput, real, cpu, conn) VALUES (%d, %.2f, %.2f, %.2f, %.4f, %.4f, %d)"
+__INS_NET_INFO__  = "INSERT INTO GBBnetMon (real, recv, rrate, send, srate) VALUES (%.4f, %.4f, %.4f, %.4f, %.4f)"
+__SEL_PROC_DATA__ = "SELECT id,pid,user,cmd FROM GBBprocData ORDER BY id"
+__SEL_PROC_INFO__ = "SELECT vsize,rss,cput,real,cpu,conn FROM GBBprocInfo WHERE procID=%d"
+__SEL_NET_INFO__  = "SELECT real,recv,rrate,send,srate FROM GBBnetMon"
+
+class gBB:
+
+    # Command line switches
+    short_options = "hc:dD:fl:LM:m:o:prs:tT:vV:"
+    long_options = ["help",           "cpu-limit=",     "dbfile=",
+                    "debug",          "dump-interval=", "force-dump",
+                    "memory-limit=",  "mon-interval=",  "out-limit",
+                    "partial",        "ppid=",          "procmon",
+                    "report=",        "strace-file=",   "surl=",
+                    "tail",           "temp-dir=",      "time-limit=",
+                    "timing",         "verbose"]
+
+    # Defaults for actions
+    doTail                   = False
+    doTiming                 = False
+    doDumpPartialOutput      = False
+    doForceDumpPartialOutput = False
+    doProcMon                = False
+    cpuLimit                 = -1
+    memoryLimit              = -1
+    outputMaxSize            = -1
+    timeLimit                = -1
+    maxRetries               = 5
+    mode                     = "exec"
+    reportType               = "cpu"
+    reportSchema             = {
+                                 "vsize": { "position":0, "min":0, "max":100000000000, "invalid":-1, "scale":1 }
+                                ,"rss":   { "position":1, "min":0, "max":100000000000, "invalid":-1, "scale":1 }
+                                ,"cpu":   { "position":4, "min":0, "max":1, "invalid":-1, "scale":100 }
+                                ,"conn":  { "position":5, "min":0, "max":100000, "invalid":-1, "scale":1 }
+                                ,"net":   { "position":0, "min":0, "max":0, "invalid":-1, "scale":1 }
+                               }
+
+    # Other defaults
+    verbose                  = False
+    debug                    = False
+    SURL                     = None
+    tempDir                  = os.getcwd()
+    partialDumpFileName      = lambda self: __PARTIALOUT__ % self.tempDir
+    partialStatFileName      = lambda self: __PARTIALSTATS__ % self.tempDir
+    partialDumpFD            = None
+    partialDumperIsRunning   = False
+    stderrSize               = 0
+    stdoutSize               = 0
+    lastPosition             = 0
+    sequence                 = 0
+    dump                     = None
+    proc                     = None
+    mon                      = None
+    monInterval              = 100
+    dumpInterval             = 600
+    pids                     = {}
+    ppid                     = None
+    lastCPU                  = 0
+    lastProcInfo             = {}
+    lastNetmon               = {}
+    straceProc               = []
+    begin                    = None
+    last                     = None
+    shutdown                 = False
+
+    if (os.environ.has_key("GBB_SURL")): SURL = os.environ["GBB_SURL"]
+
+    # Times
+    userTime                 = 0
+    systemTime               = 0
+    cuserTime                = 0
+    csystemTime              = 0
+    realTime                 = 0
+    ptime                    = -1
+    pclock                   = -1
+
+    # Program list
+    progList                 = []
+
+    # Exit code
+    exitCode                 = 0
+
+    # Database Engine
+    db                       = None
+    dbFile                   = "%s/gbb-%d.sqlite" % (os.getcwd(),os.getpid())
+
+    # Strace
+    straceFileName           = "%s/gbb-strace.%d" % (os.getcwd(),os.getpid())
+
+    def __init__ (self):
+        # Get the command line options
+        try:
+            opts, args = getopt.getopt(sys.argv[1:],
+                         self.short_options,
+                         self.long_options,
+                         )
+        except getopt.GetoptError, msg:
+            # Print the help
+            sys.stdout.write(str(msg))
+            sys.stdout.write("\nLast command:\n%s" % sys.argv[0])
+            for item in sys.argv[1:]:
+                sys.stdout.write(" %s" % item)
+            sys.stdout.write("\n")
+            self.help()
+            sys.exit(-1)
+
+        # Local vars
+        cmd=''
+        arg=''
+        for cmd, arg in opts:
+            if cmd in ('--help','-h'):
+                self.help()
+                sys.exit()
+            elif cmd in ('--debug','-d'):
+                self.debug = True
+            elif cmd in ('--cpu-limit','-c'):
+                self.cpuLimit = int(arg)
+            elif cmd in ('--dump-interval','-D'):
+                self.dumpInterval = int(arg)
+            elif cmd in ('--force-dump','-f'):
+                self.doForceDumpPartialOutput = True
+            elif cmd in ('--memory-limit','-M'):
+                self.memoryLimit = int(arg)
+            elif cmd in ('--time-limit','-l'):
+                self.timeLimit = int(arg)
+            elif cmd in ('--tail','-L'):
+                self.doTail = True
+            elif cmd in ('--mon-interval','-m'):
+                self.monInterval = int(arg)
+            elif cmd in ('--out-limit','-o'):
+                self.outputMaxSize = int(arg)
+            elif cmd in ('--partial','-p'):
+                self.doDumpPartialOutput = True
+            elif cmd in ('--report','-r'):
+                self.mode = "report"
+                if (arg in self.reportSchema.keys()):
+                    self.reportType = arg
+                else:
+                    print "Unknown report type '%s'" % arg
+                    print "Report type must be one of %s" % self.reportSchema.keys()
+                    sys.exit(-3)
+            elif cmd in ('--surl','-s'):
+                self.SURL = arg
+            elif cmd in ('--timing','-t'):
+                self.doTiming = True
+            elif cmd in ('--temp-dir','-T'):
+                self.tempDir = arg
+            elif cmd in ('--procmon',):
+                try:
+                    import sqlite
+                    self.db = sqlite
+                    self.doProcMon = True
+                except:
+                    print "Cannot create DB or no sqlite db engine available."
+                    raise
+            elif cmd in ('--dbfile',):
+                self.dbFile = arg
+            elif cmd in ('--ppid',):
+                self.ppid = int(arg)
+            elif cmd in ('--strace-file',):
+                self.straceFileName = arg
+            elif cmd in ('--verbose','-v'):
+                self.verbose = True
+
+        if (self.timeLimit > 0 and self.timeLimit < self.monInterval):
+            self.monInterval = self.timeLimit
+        if (len(args) == 0 and not self.ppid and self.mode == 'exec'):
+            print "No program list given."
+            sys.exit(-1)
+
+        if (self.ppid):
+            try:
+                os.kill(self.ppid,0)
+            except:
+                print "Process ID %d does not exist or you do not have enough privileges to attach it" % self.ppid
+                sys.exit(-2)
+
+        if (self.doDumpPartialOutput and not self.SURL):
+            print "No surl specified for partial output monitoring"
+            self.help()
+            sys.exit()
+
+        self.progList = args
+
+
+    def run (self):
+        if (self.verbose):
+            sys.stdout.write(BANNER % (__version__.strip(),__author__))
+        self.pids['main'] = os.getpid()
+
+        # Time the command if requested
+        if (self.doTiming): self.timer()
+
+        # Start the monitoring thread
+        try:
+            self.mon = threading.Thread(target=self.monitor)
+            self.mon.start()
+        except:
+            if (self.verbose): sys.stderr.write("GBB> No monitoring started\n")
+
+        # Start the user monitoring thread
+        try:
+            userMod = gbbuser()
+            userMod.set(self)
+            self.user = threading.Thread(target=userMod.run)
+            self.user.start()
+        except:
+            if (self.verbose): sys.stderr.write("GBB> No user module started\n")
+
+        # Start the thread to dump the partial output, if requested
+        if (self.doDumpPartialOutput):
+            if (__LCG__):
+                try:
+                    self.dump = threading.Thread(target=self.dumpPartialOutput)
+                    self.dump.start()
+                except:
+                    sys.stderr.write("GBB> Cannot start the partial output dumper.\n")
+                    raise
+            else:
+                sys.stderr.write("GBB> No gfal or lcg_util python API found.\n")
+                sys.stderr.write("GBB> No partial dump will be available.\n")
+
+        if (self.mode == "exec"):
+            # Executes the command
+            try:
+                self.proc = threading.Thread(target=self.runProcess)
+                self.proc.start()
+                # Set the process start time
+                if (not self.begin):
+                    self.begin = time.time()
+                    self.last  = self.begin
+                while self.proc.isAlive():
+                    self.proc.join(5)
+            except:
+                sys.stderr.write("GBB> Cannot start the process\n")
+                raise
+        elif (self.mode == "report"):
+            # Produce a report from the data stored in the DB
+            if (not self.db):
+                try:
+                    import sqlite
+                    self.db = sqlite
+                except:
+                    print "No SQLite db engine available."
+            if (self.db):
+                if (os.path.exists(self.dbFile)):
+                    dbconn = self.db.connect(self.dbFile)
+                    dbcur  = dbconn.cursor()
+                    if (self.reportType == "net"):
+                        query  = __SEL_NET_INFO__
+                        dbcur.execute(query)
+                        for row in dbcur:
+                            print "%.2f,%.2f,%.2f,%.2f,%.2f" % (row[0],row[1],row[2],row[3],row[4])
+                    else:
+                        query  = __SEL_PROC_DATA__
+                        idlist = []
+                        legend = ['"Time"']
+                        dbcur.execute(query)
+                        for row in dbcur:
+                            print '"proc%03d",%d,"%s","%s"' % (row[0], row[1], row[2], row[3])
+                            idlist.append(row[0])
+                            legend.append('"proc%03d"' % row[0])
+                        dbcur.close()
+                        dbcur  = dbconn.cursor()
+                        procTime = []
+                        procMetric = {}
+                        for id in idlist:
+                            query  = __SEL_PROC_INFO__ % id
+                            dbcur.execute(query)
+                            for row in dbcur:
+                                tm = row[3]
+                                if (not procMetric.has_key(tm)): procMetric[tm] = {}
+                                procMetric[tm][id] = row[self.reportSchema[self.reportType]['position']]
+                        if (len(idlist) > 0): print string.join(legend,",")
+                        tkeys = procMetric.keys()
+                        tkeys.sort()
+                        for tkey in tkeys:
+                            MetricPerf = []
+                            MetricPerf.append("%.4f" % tkey)
+                            for id in idlist:
+                                if (procMetric[tkey].has_key(id)):
+                                    metric = procMetric[tkey][id]
+                                    if (metric < self.reportSchema[self.reportType]['min']):
+                                        metric = self.reportSchema[self.reportType]['min']
+                                    if (metric > self.reportSchema[self.reportType]['max']):
+                                        metric = self.reportSchema[self.reportType]['max']
+                                else:
+                                    metric = self.reportSchema[self.reportType]['invalid']
+                                if (metric >= self.reportSchema[self.reportType]['min']):
+                                    metric = metric * self.reportSchema[self.reportType]['scale']
+                                MetricPerf.append("%.4f" % metric)
+                            print string.join(MetricPerf,",")
+                    dbcur.close()
+                else:
+                    print "%s : No such file" % self.dbFile
+
+        # Close the threads
+        self.close()
+
+        # Cleanup
+        self.cleanup()
+
+        # End the timing session
+        if (self.doTiming): self.timer()
+
+        # The end
+        sys.exit(self.exitCode)
+
+
+    def runProcess (self):
+        if (self.ppid):
+            # Attach to a running process group
+            if (self.verbose): sys.stderr.write ("GBB> Attaching process ID %d\n" % self.ppid)
+            self.pids['proc'] = self.ppid
+
+            while 1:
+                try:
+                    os.kill(self.ppid,0)
+                    time.sleep(0.5)
+                    if (self.shutdown): break
+                except:
+                    if (self.verbose): sys.stderr.write ("GBB> Process ID %d exited\n" % self.ppid)
+                    break
+        else:
+            # Build the command line
+            cmd = string.join(self.progList)
+
+            # Check if the command exists
+            os.environ['PATH'] = os.path.curdir+':'+os.environ['PATH']
+            p = commands.getoutput("which %s 2>/dev/null | tail -n 1 | sed 's/^[ \t]*//'" % self.progList[0])
+            if (len(p) > 0):
+                pname = p[0].replace('\n','')
+                if (pname != ""): self.progList[0] = pname
+            if (not os.access(self.progList[0], os.F_OK)):
+                sys.stderr.write("GBB> Cannot find '%s'\n" % self.progList[0])
+                self.close()
+                self.exitCode=127
+                sys.exit(-1)
+
+            # Check and fix the file permissions
+            if (not os.access(self.progList[0], os.X_OK | os.R_OK )):
+                try:
+                    os.chmod(self.progList[0], 0755)
+                except:
+                    sys.stderr.write("GBB> Unable to execute 'chmod 0755 %s'\n" % self.progList[0])
+                    self.exitCode=127
+                    sys.exit(-1)
+
+
+            # If a partial dump has been requested, open a new file for it
+            if (self.doDumpPartialOutput):
+                try:
+                    self.partialDumpFD = open(self.partialDumpFileName(),'w')
+                except:
+                    sys.stderr.write("GBB> Cannot open '%s' for writing\n" % self.partialDumpFileName())
+
+            # Executes the command
+            if (self.verbose): sys.stderr.write("GBB> Executing '%s'\n" % cmd)
+            child             = popen2.Popen3(cmd, True)
+            child_stdin       = child.tochild
+            child_stdout      = child.fromchild
+            child_stderr      = child.childerr
+            self.pids['proc'] = child.pid
+
+            # Close the standard input as it will not be used
+            child_stdin.close()
+            child_stdoutfd = child_stdout.fileno()
+            child_stderrfd = child_stderr.fileno()
+            stdout_eof = False
+            stderr_eof = False
+
+            ## Run strace if process monitoring is enabled
+            if (self.doProcMon and self.mode == 'exec'):
+                if (self.verbose): sys.stderr.write ("GBB> Starting strace for pid %d\n" % child.pid)
+                try:
+                    os.spawnvp(os.P_NOWAIT,"strace", ("strace","-q","-c","-o%s.pid_%d.out" % (self.straceFileName,child.pid), "-p%d" % child.pid))
+                    self.straceProc.append(child.pid)
+                except:
+                    if (self.verbose): sys.stderr.write ("GBB> Cannot start strace for pid %d\n" % child.pid)
+
+            # Dump the standard output and error, when they are available
+            while 1:
+                (self.userTime,self.systemTime,self.cuserTime,self.csystemTime,self.realTime)=os.times()
+                ready = select.select( [child_stdoutfd, child_stderrfd], [], [], 2 )
+                if (child_stderrfd in ready[0]):
+                    stderr = child_stderr.readline()
+                    if (stderr):
+                        sys.stderr.write(stderr)
+                        if (self.partialDumpFD):
+                            self.partialDumpFD.write(stderr)
+                            self.partialDumpFD.flush()
+                        if (self.outputMaxSize):
+                            self.stderrSize = self.stderrSize + len(stderr)
+                    else:
+                        stderr_eof = True
+                if (child_stdoutfd in ready[0]):
+                    stdout = child_stdout.readline()
+                    if (stdout):
+                        sys.stdout.write(stdout)
+                        if (self.partialDumpFD):
+                            self.partialDumpFD.write(stdout)
+                            self.partialDumpFD.flush()
+                        if (self.outputMaxSize):
+                            self.stdoutSize = self.stdoutSize + len(stdout)
+                    else:
+                        stdout_eof = True
+                if (child.poll()>=0 and stderr_eof and stdout_eof): break
+            # Save the exit code
+            if (self.exitCode == 0): self.exitCode = child.poll()/256
+
+            # Close the standard output and error
+            child_stdout.close()
+            child_stderr.close()
+
+            # Close the partial output file
+            if (self.partialDumpFD): self.partialDumpFD.close()
+
+        # Reset the process pid
+        if (self.pids.has_key('proc')): del self.pids['proc']
+
+    def timer (self):
+        # Get the timing betweek two calls to the same function
+        if (self.verbose): sys.stderr.write ("GBB> Timer called\n")
+        if (self.ptime == -1):
+            self.ptime  = time.time()
+            self.pclock = time.clock()
+        else:
+            stopTime   = time.time()
+            stopClock  = time.clock()
+            sys.stderr.write ("GBB> Elapsed time (s):\t%8.2f\n" % (stopTime-self.ptime))
+            sys.stderr.write ("GBB> GBB CPU time (s):\t%8.2f\n" % (stopClock-self.pclock))
+            self.time  = -1
+            self.clock = -1
+
+    def monitor(self):
+        if (not self.begin):
+            self.begin = time.time()
+            self.last  = self.begin
+        usleep = int(self.monInterval/0.1)
+        # Process monitor variables
+        procMon    = {}
+        procID     = {}
+        # Open the database file
+        dbconn   = None
+        dbcur    = None
+        if (self.doProcMon and self.mode == 'exec'):
+            if (os.path.exists(self.dbFile)): os.remove(self.dbFile)
+            dbconn = self.db.connect(self.dbFile)
+            dbcur  = dbconn.cursor()
+            for ddl in __CREATE_DB__:
+                try:
+                    dbcur.execute(ddl)
+                except:
+                    pass
+            dbconn.commit()
+        # Monitor the processes
+        while (not self.shutdown):
+            for num in range(0,usleep):
+                if (self.shutdown): break
+                time.sleep(0.1)
+            elapsed = time.time()-self.begin
+            if (self.timeLimit > 0 and elapsed >= self.timeLimit and self.pids.has_key('proc')):
+                if (self.pids.has_key('proc')):
+                    sys.stderr.write("GBB> Process exceeded the maximum time limit (%ds)\n" % self.timeLimit)
+                    sys.stderr.write("GBB> Killing pid %s now\n" % self.pids['proc'])
+                    self.exitCode=10
+                    self.killproc()
+                    self.cleanup()
+
+            # Retrieve the process info
+            if (self.pids.has_key('proc')):
+                procInfo,procTree,netmon = self.getProcessStats(self.pids['proc'])
+                # Run strace for new processes if process monitoring is enabled
+                if (self.doProcMon and self.mode == 'exec'):
+                    for proc in procTree:
+                        if (proc[1] not in self.straceProc):
+                            try:
+                                os.kill(self.ppid,0)
+                                if (self.verbose): sys.stderr.write ("GBB> Starting strace for pid %d\n" % proc[1])
+                                os.spawnvp(os.P_NOWAIT,"strace", ("strace","-q","-c","-o%s.pid_%d.out" % (self.straceFileName,proc[1]), "-p%d" % proc[1]))
+                                self.straceProc.append(proc[1])
+                            except:
+                                if (self.verbose): sys.stderr.write ("GBB> Cannot start strace for pid %d or process is over\n" % proc[1])
+                if (dbconn):
+                    if (self.debug): sys.stderr.write ("%s" % procTree)
+                    for proc in procTree:
+                        if (not procID.has_key(proc[1])):
+                            # Process data
+                            if (self.debug): sys.stderr.write ("GBB> Storing process data in the DB\n")
+                            query = __INS_PROC_DATA__ % (self.pids['proc'], proc[1], proc[6], proc[7], proc[9])
+                            if (self.debug): sys.stderr.write ("GBB> Executing query: %s\n" % query)
+                            dbcur.execute(query)
+                            procid = dbcur.lastrowid
+                            # Performance data
+                            query = __INS_PROC_INFO__ % (procid, proc[2], proc[3], proc[4], procInfo['real'], proc[8]/procInfo['interval'], proc[10])
+                            if (self.debug): sys.stderr.write ("GBB> Executing query: %s\n" % query)
+                            procMon[proc[1]] = proc
+                            procID[proc[1]]  = procid
+                            # Network data
+                            if (self.debug): sys.stderr.write ("GBB> Storing network data in the DB\n")
+                            query = __INS_NET_INFO__ % (procInfo['real'], netmon['recv'], netmon['rdiff']/procInfo['interval']
+                                                                        , netmon['send'], netmon['sdiff']/procInfo['interval'])
+                            if (self.debug): sys.stderr.write ("GBB> Executing query: %s\n" % query)
+                            dbcur.execute(query)
+                            # Commit
+                            dbconn.commit()
+                            if (self.debug): sys.stderr.write ("GBB> procID = %s\n" % procID)
+                        else:
+                            # Performance data
+                            if (self.debug): sys.stderr.write ("GBB> Storing performance data in the DB\n")
+                            query = __INS_PROC_INFO__ % (procID[proc[1]], proc[2], proc[3], proc[4], procInfo['real'], proc[8]/procInfo['interval'], proc[10])
+                            if (self.debug): sys.stderr.write ("GBB> Executing query: %s\n" % query)
+                            dbcur.execute(query)
+                            # Network data
+                            if (self.debug): sys.stderr.write ("GBB> Storing network data in the DB\n")
+                            query = __INS_NET_INFO__ % (procInfo['real'], netmon['recv'], netmon['rdiff']/procInfo['interval']
+                                                                        , netmon['send'], netmon['sdiff']/procInfo['interval'])
+                            if (self.debug): sys.stderr.write ("GBB> Executing query: %s\n" % query)
+                            dbcur.execute(query)
+                            # Commit
+                            dbconn.commit()
+                    
+                if (self.verbose):
+                    sys.stderr.write("\n") 
+                    prochead = ''
+                    procinfo = ''
+                    procsep  = ''
+                    for key in ['vsize','rss','cput','cpu','real']:
+                        if (procInfo.has_key(key)):
+                            if (len(prochead) > 0):
+                                prochead = prochead + ' '
+                                procsep  = procsep  + ' '
+                                procinfo = procinfo + ' '
+                            prochead = prochead + ("%8s" % key)
+                            procsep  = procsep  + "--------"
+                            procinfo = procinfo + ("%8.2f" % procInfo[key])
+                    sys.stderr.write("GBB> %s\n" % prochead) 
+                    sys.stderr.write("GBB> %s\n" % procsep) 
+                    sys.stderr.write("GBB> %s\n" % procinfo) 
+
+                # Check for CPU time limit
+                if (procInfo.has_key('cpu') and self.cpuLimit > 0 and procInfo['cpu'] < self.cpuLimit):
+                    if (not procInfo.has_key('error')):
+                        sys.stderr.write("GBB> Process consumed only %3.1f%% of the CPU time in the last %f s.\n" % (procInfo['cpu'],procInfo['interval']))
+                        sys.stderr.write("GBB> Killing pid %s now\n" % self.pids['proc'])
+                        self.exitCode=20
+                        self.killproc()
+                        self.cleanup()
+
+                # Check for memory limit
+                if (procInfo.has_key('rss') and self.memoryLimit > 0 and procInfo['rss'] > self.memoryLimit):
+                    sys.stderr.write("GBB> Memory limit exceeded. Max=%f, current=%f.\n" % (self.memoryLimit,procInfo['rss']))
+                    sys.stderr.write("GBB> Killing pid %s now\n" % self.pids['proc'])
+                    self.exitCode=30
+                    self.killproc()
+                    self.cleanup()
+
+                # Check for stdout/stderr max size
+                outsize = (self.stdoutSize + self.stderrSize) / 1024.
+                if (self.outputMaxSize > 0 and outsize > self.outputMaxSize):
+                    sys.stderr.write("GBB> Max output size exceeded. Max=%.1f, current=%.1f.\n" % (self.outputMaxSize,outsize))
+                    sys.stderr.write("GBB> Killing pid %s now\n" % self.pids['proc'])
+                    self.exitCode=40
+                    self.killproc()
+                    self.cleanup()
+
+
+    def dumpPartialOutput(self):
+        self.partialDumperIsRunning = True
+        if (self.verbose): sys.stderr.write("GBB> Output dumper started\n")
+
+        # Get the job id
+        try:
+            jobID = os.environ['EDG_WL_JOBID'].split('/')[-1]
+        except:
+            sys.stderr.write("GBB> Cannot get the jobID. Terminating dumper.\n")
+            return
+
+        # Get the certificate subject and check if the proxy is valid
+        proxyid = commands.getoutput(__PROXY_INFO__)
+        if (len(proxyid) == 0):
+            sys.stderr.write("GBB> Cannot retrieve the identity.\n")
+            sys.stderr.write("GBB> Terminating dumper.\n")
+            return
+        identity = re.sub('^_','',re.sub('[^\w]','_',proxyid.replace("/CN=proxy","")))
+
+        # Build the SE path
+        SEpath=("%s/%s/%s" % (self.SURL,identity,jobID))
+        if (self.verbose):
+            sys.stderr.write("GBB> Partial output will be saved in the SE in\n")
+            sys.stderr.write("GBB> %s\n" % SEpath)
+
+        # Now really start the dumper
+        usleep = self.dumpInterval/0.1
+        while (not self.shutdown):
+            for num in range(0,int(usleep)):
+                if (not self.shutdown): time.sleep(0.1)
+            if (self.shutdown and self.verbose):
+                sys.stderr.write("GBB> Finalizing partial dumper.\n")
+            # Dump the partial output of the stdout/stderr files
+            dumpEnabled = self.partialDumpEnabled(SEpath)
+            if (self.partialDumpFD and (dumpEnabled or self.doTail)):
+                try:
+                    fd = open(self.partialDumpFileName(),'r')
+                    fd.seek(self.lastPosition)
+                except:
+                    sys.stderr.write("GBB> Cannot read partial output\n")
+                    sys.stderr.write("GBB> Terminating partial dumper\n")
+                    return
+                fdEOF  = False
+                fdout  = None
+                fdstat = None
+                outFileName=self.partialDumpFileName()+("_%06d" % self.sequence)
+                statFileName=self.partialStatFileName()+("_%06d" % self.sequence)
+                outputlen = 0
+                while not fdEOF:
+                    try:
+                        pout = fd.readline()
+                        if (len(pout) > 0):
+                            if (dumpEnabled):
+                                if (not fdout): fdout = open(outFileName,'w')
+                                fdout.write(pout)
+                            outputlen = outputlen + len(pout)
+                        else:
+                            fdEOF = True
+                    except:
+                        fdEOF = True
+                if (fdout): fdout.close()
+                if (fd): fd.close()
+
+                # Get the process stats
+                if (dumpEnabled and self.pids.has_key('proc')):
+                    prochead = ''
+                    procinfo = ''
+                    procsep  = ''
+                    procInfo,procTree,netmon = self.getProcessStats(self.pids['proc'])
+                    if (not fdstat): fdstat = open(statFileName,'w')
+                    for key in ['rss','cput','cpu','real']:
+                        if (procInfo.has_key(key)):
+                            if (len(prochead) > 0):
+                                prochead = prochead + ' '
+                                procsep  = procsep  + ' '
+                                procinfo = procinfo + ' '
+                            prochead = prochead + ("%8s" % key)
+                            procsep  = procsep  + "--------"
+                            procinfo = procinfo + ("%8.2f" % procInfo[key])
+                    fdstat.write("%s\n" % prochead) 
+                    fdstat.write("%s\n" % procsep) 
+                    fdstat.write("%s\n" % procinfo) 
+                if (fdstat): fdstat.close()
+
+                # Send out the data
+                if (dumpEnabled):
+                    rcout = self.send(SEpath,outFileName)
+                    if (rcout == 0):
+                        self.lastPosition = self.lastPosition + outputlen
+                        if (self.debug):
+                            sys.stderr.write("GBB> %d bytes sent.\n" % outputlen)
+                    rcstat = self.send(SEpath,statFileName)
+                    if (rcout == 0 or rcstat == 0):
+                        self.sequence = self.sequence + 1
+                elif (self.doTail):
+                    self.lastPosition = self.lastPosition + outputlen
+
+        self.partialDumperIsRunning = False
+
+
+    def exists(self,path):
+        if (self.debug): sys.stderr.write("GBB> checking %s\n" % path)
+        rc = gfal.gfal_access(path,os.F_OK)
+        if (rc == 0):
+            return True
+        else:
+            if (gfal.gfal_get_errno() == errno.ENOENT):
+                return False
+            else:
+                return True
+
+
+    def mkdir(self,dir):
+        gfalreq = {}
+        validSURL = False
+        SURL = dir.split("=")
+        SURLS = []
+        while (not validSURL):
+            newSURL = "%s=%s" % (SURL[0],SURL[1])
+            if (self.exists(newSURL)):
+                validSURL = True
+            else:
+                SURLS.append("%s=%s/" % (SURL[0],SURL[1]))
+                newpath = os.path.dirname(SURL[1])
+                if (newpath != SURL[1]):
+                    SURL[1] = newpath
+                else:
+                    sys.stderr.write("GBB> cannot find any suitable SURL\n")
+                    break
+
+        if (validSURL):
+            SURLS.reverse()
+            for SURL in SURLS:
+                if (self.debug): sys.stderr.write("GBB> creating %s\n" % SURL)
+                rc = gfal.gfal_mkdir(SURL,0775)
+                if (rc != 0):
+                    sys.stderr.write("GBB> cannot create %s\n" % SURL)
+        return 0
+
+
+    def partialDumpEnabled(self, SEpath):
+        # Check if the partial output is enabled
+        # or we need to force it
+        if (self.exists(SEpath)):
+            return True
+        elif (self.doForceDumpPartialOutput):
+            if (self.mkdir(SEpath) == 0):
+                return True
+            else:
+                sys.stderr.write("GBB> Cannot create %s\n" % SEpath)
+                return False
+
+
+    def send(self,SEpath,source):
+        fname = os.path.basename(source)
+        dest  = "%s/%s" % (SEpath,fname)
+        if (os.access(source,os.F_OK)):
+            if (self.verbose):
+                sys.stderr.write("GBB> Copying %s to %s\n" % (source,dest))
+            nbstreams = 3
+            (rc,errmsg) = lcg_util.lcg_cp3(source,dest,lcg_util.TYPE_NONE,lcg_util.TYPE_NONE,lcg_util.TYPE_NONE,0,None,nbstreams,None,0,0,200,None,None)
+            if (rc != 0):
+                sys.stderr.write("GBB> copy failed: %s\n" % errmsg)
+                return 1
+            else:
+                return 0
+        else:
+            return 2
+
+    def getProcessStats(self, procPPID):
+        # Set the initial time, if needed
+        if (not self.begin):
+            self.begin = time.time()
+            self.last  = self.begin
+
+        # Get the current time
+        current = time.time()
+
+        # Get the info on the processes from ps
+        pInfo = {}
+        pidList  = []
+        procTree = []
+        procData = {}
+        schema = {'vsize':2, 'rss':3, 'cput':4}
+        #pList = commands.getoutput('ps xlS').split('\n')[1:]
+        pList = commands.getoutput('ps axS -o user,sess,pid,ppid,time,vsize,rss,cp,wchan,cmd').split('\n')[1:]
+        for proc in pList:
+            info  = proc.split()
+            user  = info[0]
+            sess  = int(info[1])
+            pid   = int(info[2])
+            ppid  = int(info[3])
+            tm    = info[4].split(':')
+            cput  = int(tm[0])*24+int(tm[1])*60+int(tm[2])
+            vsize = int(info[5])/1024.
+            rss   = int(info[6])/1024.
+            cpup  = int(info[7])/10.
+            wchan = info[8]
+            cmd   = string.join(info[9:])
+            if (self.lastProcInfo.has_key(str(pid))):
+                cpudiff = cput - self.lastProcInfo[str(pid)] 
+            else:
+                cpudiff = 0
+            self.lastProcInfo[str(pid)] = cput
+            pInfo[str(pid)] = [ppid, pid, vsize, rss, cput, wchan, cmd, time.asctime(), cpudiff, user]
+            if (pid == procPPID):
+                pidList = [[procPPID]]
+                procData['vsize'] = vsize
+                procData['rss']   = rss
+                procData['cput']  = cput
+                procTree.append(pInfo[str(pid)])
+
+        # Build the global info for process procPPID
+        # by summing up all the contributions from the children
+        if (self.debug):
+            if (len(pidList) > 0):
+                sys.stderr.write("PPID: %d %d\n" % (procPPID, pidList[len(pidList)-1][0]))
+                for pid, info in pInfo.items():
+                    sys.stderr.write("PS -> PID %s: PPID=%d VSIZE=%.2f RSS=%.2f CPUT=%d WCHAN=%s CMD=%s\n" % (info[1], info[0], info[2], info[3], info[4], info[5], info[6]))
+        while 1:
+            if (len(pidList) > 0):
+                parents = pidList[len(pidList)-1]
+            else:
+                parents = []
+            pidArray = []
+            if (self.debug):
+                sys.stderr.write("PARENT LIST:")
+                for parent in parents:
+                    sys.stderr.write(" %d" % parent)
+                sys.stderr.write("\n")
+            for parent in parents:
+                if (self.debug):
+                    sys.stderr.write("Finding children of pid %d\n" % parent)
+                for pid, info in pInfo.items():
+                    if (info[0] == parent):
+                        if (self.debug):
+                            sys.stderr.write("Pid %d is a child of pid %d\n" % (int(pid), parent))
+                        pidArray.append(int(pid))
+                        procTree.append(pInfo[pid])
+                        if (self.debug):
+                            sys.stderr.write("Pid %d data: %s\n" % (int(pid), pInfo[pid]))
+                        for key, pos in schema.items():
+                            if (self.debug):
+                                sys.stderr.write("%s + %f\n" % (key, info[pos]))
+                            procData[key] = procData[key] + info[pos]
+            if (len(pidArray) > 0):
+                pidList.append(pidArray)
+            else:
+                break
+        procData['hierarchy'] = pidList
+        procData['real']      = current - self.begin
+        procData['interval']  = current - self.last
+        if (procData.has_key('cput')):
+            cpudiff = procData['cput']-self.lastCPU
+            if (cpudiff < 0):
+                procData['error'] = 1
+                cpudiff = 0
+            timediff = current-self.last
+            if (timediff > 0):
+                procData['cpu'] = cpudiff/timediff*100.
+            else:
+                procData['cpu'] = 0
+            self.lastCPU = procData['cput']
+        self.last = current
+        if (self.debug): sys.stderr.write("Process Hierarchy: %s\n" % procData['hierarchy'])
+
+        netmon = {'recv':0., 'send':0.}
+        if (self.doProcMon):
+            try:
+                # Add the network information
+                p = re.compile("\s+(\w+):(.*)")
+                netdev = open("/proc/net/dev")
+                for n in netdev:
+                    m = p.search(n)
+                    if (m and m.group(1)[:3] == "eth"):
+                        netstat = m.group(2).split()
+                        netmon['recv'] += int(netstat[0])/1048576.
+                        netmon['send'] += int(netstat[8])/1048576.
+                netdev.close()
+                if (self.lastNetmon):
+                    netmon['rdiff'] = netmon['recv'] - self.lastNetmon['recv']
+                    netmon['sdiff'] = netmon['send'] - self.lastNetmon['send']
+                else:
+                    netmon['rdiff'] = 0.0
+                    netmon['sdiff'] = 0.0
+                self.lastNetmon = netmon
+            except:
+                sys.stderr.write("GBB> Cannot get network info.\n")
+                raise
+                
+            # Connections
+            for proc in procTree:
+                nList = commands.getoutput('/usr/sbin/lsof -i -a -p %d | grep -i established' % proc[1]).split('\n')
+                if (len(nList[0]) > 0): proc.append(len(nList))
+                else:                   proc.append(0)
+
+        # Return the process info dictionaries
+        return procData, procTree, netmon
+
+    def close(self):
+        # Send the shutdown to all the threads
+        self.shutdown = True
+        #self.dumpPartialOutput()
+
+    def cleanup(self):
+        # Remove the partial output file
+        if (os.access(self.partialDumpFileName(),os.F_OK)):
+            while (self.partialDumperIsRunning):
+                if (self.verbose):
+                    sys.stderr.write("GBB> Waiting for the output dumper to exit.\n")
+                time.sleep(5)
+            try:
+                os.remove(self.partialDumpFileName())
+            except:
+                pass
+
+    def killproc(self):
+        # Kill all the child processes
+        if (self.pids.has_key('proc')):
+            procInfo,procTree,netmon = self.getProcessStats(self.pids['proc'])
+            if (procInfo.has_key('hierarchy')):
+                for pids in procInfo['hierarchy']:
+                    for pid in pids:
+                        try:
+                            os.kill(pid,signal.SIGKILL)
+                        except:
+                            pass
+
+    def help(self):
+        # Print the help
+        print HELP % (__version__.strip(),self.dbFile, self.reportSchema.keys()
+                                         ,self.straceFileName, __author__)
+
+
+# Signal handler
+def signalHandler(signal, frame):
+     if (gbb.ppid):
+         gbb.shutdown = True
+     else:
+         gbb.killproc()
+
+# main class
+if __name__ == '__main__':
+    global gbb
+
+    # Set up signal handlers
+    signal.signal(signal.SIGINT,  signalHandler)
+    signal.signal(signal.SIGTERM, signalHandler)
+
+    # Create a new gBB object
+    gbb=gBB()
+    # Start the gBB object
+    gbb.run()

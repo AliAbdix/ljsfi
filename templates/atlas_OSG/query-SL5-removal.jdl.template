@@ -1,0 +1,20 @@
+Executable = "/bin/hostname";
+OutputSandbox = {"stdout","stderr"};
+stdoutput = "stdout";
+stderror = "stderr";
+VirtualOrganisation = "atlas";
+Requirements = ((other.GlueCEPolicyMaxCPUTime > 1000 || other.GlueCEPolicyMaxCPUTime == 0)
+             && (other.GlueHostMainMemoryRAMSize >= 1000)
+             && (((   other.GlueHostOperatingSystemName == "CentOS"
+                  ||  other.GlueHostOperatingSystemName == "RedHatEnterpriseAS"
+                  ||  other.GlueHostOperatingSystemName == "RedHatEnterpriseServer")
+                  && (other.GlueHostOperatingSystemRelease >= 5.0))
+                ||
+                (     RegExp("SUSE.*",other.GlueHostOperatingSystemName)
+                  &&  other.GlueHostOperatingSystemRelease >= 10
+                )
+                ||
+                (     RegExp("Scientific.*",other.GlueHostOperatingSystemName)
+                  &&  other.GlueHostOperatingSystemRelease >= 5.0
+                ))
+             && Member("@RELTAG@",other.GlueHostApplicationSoftwareRunTimeEnvironment));

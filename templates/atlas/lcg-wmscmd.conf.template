@@ -1,0 +1,16 @@
+[
+rank = - other.GlueCEStateEstimatedResponseTime;
+requirements = other.GlueCEStateStatus == "Production";
+RetryCount = 3;
+ErrorStorage = "/tmp";
+OutputStorage = "/tmp/jobOutput";
+ListenerPort = 44000;
+ListenerStorage = "/tmp";
+LoggingTimeout = 30;
+LoggingSyncTimeout = 30;
+LoggingDestination = @LD@;
+NSLoggerLevel = 0;
+DefaultLogInfoLevel = 0;
+DefaultStatusLevel = 0;
+DefaultVo = "atlas";
+]

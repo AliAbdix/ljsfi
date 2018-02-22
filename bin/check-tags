@@ -1,0 +1,30 @@
+#!/bin/sh
+
+search () {
+  ldapsearch -x -P2 -h $1  -p 2135 -b "mds-vo-name=local,o=grid" \
+            | grep GlueHostApplicationSoftwareRunTimeEnvironment \
+            | grep -i atlas | cut -d: -f 2
+}
+
+source $CONFPATH/install.conf
+
+if [ "$1" = "" ] ; then
+  while read line ; do
+    CEFQDN=`echo $line | cut -d: -f 1`
+    TAG=`search $CEFQDN`
+    if [ "$TAG" != "" ] ; then
+      for item in $TAG; do
+        printf "%-35s : %s\n" $CEFQDN $item
+      done
+    fi
+  done < $HOSTLIST
+else
+  TAG=`search $1`
+  if [ "$TAG" != "" ] ; then
+    for item in $TAG; do
+      printf "%-30s : %s\n" $1 $item
+    done
+  fi
+fi
+
+exit

@@ -1,0 +1,12 @@
+{
+    "JobDef": {
+        "Executable": "http://atlpan.web.cern.ch/atlpan/install/sw-mgr",
+        "Arguments": "--test @RELNAME@ -l @OSGLOGICALPATH@/@RELMAIN@ -p @OSGPHYSICALPATH@/@VERSIONAREA@ --grid-name @GRIDNAME@ --site-type @INFOSYS_SITETYPE@ --require-shfs --no-tag -P @SWNAME@ --require-prj @REQUIREDPRJ@ -T patch -t @ARCH@ -O opt -m @PACMANVERSION@ --xml install.xml --stagein http://atlpan.web.cern.ch/atlpan/install/metadata.xml --site-config $OSG_APP/atlas_app/AtlasSiteConfig.sh --kv-conf http://kv.roma1.infn.it/KV/KVBENCH2014.xml --kv-disable ALL --kv-enable KVBENCH2014 --kvpost-tag KVBENCH2014_@SITE_CS@ @KVPOST@ @DBRELEASE@ --",
+        "Site": "@SITE_CS@"
+    },
+    "ResDef": {
+        "resource_type": "@INFOSYS_SITETYPE@",
+        "lfcprodpath": "@INFOSYS_LFCPRODPATH@",
+        "seprodpath": "@INFOSYS_SEPRODPATH@"
+    }
+}

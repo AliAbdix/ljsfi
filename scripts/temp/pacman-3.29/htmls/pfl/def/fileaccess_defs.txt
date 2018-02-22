@@ -1,0 +1,48 @@
+[fileaccess]
+[File access manipulation]
+[6]
+
+isWorldRead(path[,option])
+isWorldWrite(path[,option])
+isWorldExecute(path[,option])
+isGroupRead(path[,option])
+isGroupWrite(path[,option])
+isGroupExecute(path[,option])
+isOwnerRead(path[,option])
+isOwnerWrite(path[,option])
+isOwnerExecute(path[,option])
+
+These atoms test whether files or directories are world/group/owner read/writable.  The optional <i>option</i>
+argument can be either set to <b>on</b> (the default) or <b>off</b> as desired.
+
+
+setWorldRead(path)
+setWorldWrite(path)
+setWorldExecute(path)
+setGroupWrite(path)
+setGroupExecute(path)
+setOwnerRead(path) 
+setOwnerWrite(path)
+setOwnerExecute(path)
+
+These are the same as the previous atoms except that they will set the indicatedfile access if it has not been done already.  As
+with all Pacman operations, the change in file access will be undone when the Pacman package is uninstalled. The optional <i>option</i>
+argument can be either set to <b>on</b> (the default) or <b>off</b> as desired.
+
+
+ownedBy(path[,username])
+
+ownedBy tests that the file specified by <i>path</i> is owned by <i>username</i>.  The default for <i>username</i> is 
+the username of the installer.
+
+
+chown(path[,username])
+chownR(path[,username])
+
+chown changes the ownership of a file to <i>username</i>.  <i>username</i> defaults to the username of the installer.
+chownR recursively changes the ownership of a directory tree.
+
+absPath([path])
+
+absPath requires that the root directory of the Pacman installation is an absolute path
+rather than a symlink path.

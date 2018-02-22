@@ -1,0 +1,5 @@
+#!/usr/bin/env python
+
+from ljsfutils import *
+utils=ljsfUtils()
+print utils.getProxyLifetime()

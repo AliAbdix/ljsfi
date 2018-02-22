@@ -1,0 +1,17 @@
+#!/bin/sh
+
+# Base releases
+#autorequest -b 12.0.% &> /dev/null
+# Patch releases
+#autorequest -p --template query-validation-patch 12.0.% &> /dev/null
+
+# Base releases
+autorequest -b &> /dev/null
+# Patch releases
+autorequest -p --template query-validation-patch &> /dev/null
+
+# Extra releases, available in CVMFS only
+autorequest -b --target=none --all --has-cvmfs --cvmfs-available &> /dev/null
+autorequest -p --template query-validation-patch --target=none --all --has-cvmfs --cvmfs-available &> /dev/null
+
+exit

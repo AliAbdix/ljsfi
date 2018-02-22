@@ -1,0 +1,15 @@
+#.*.cern.ch
+.*blah.*
+ares02.cyf-kr.edu.pl
+ce2.egee.unile.it
+gw39.hep.ph.ic.ac.uk
+ce.egee.man.poznan.pl
+spaci01.na.infn.it
+cclcgceli.*in2p3.fr:2119/jobmanager-.*-verylong
+cccreamceli.*in2p3.fr:8443/cream-.*-verylong
+cclcgceli01.*
+cclcgceli05.*
+ce01-lcg.cr.cnaf.infn.it:8443/.*(-debug|_simul)
+ce06-lcg.cr.cnaf.infn.it:2119/.*(-atlas|_simul)
+ce1.glite.ecdf.ed.ac.uk:.*-wholenode
+ce3.glite.ecdf.ed.ac.uk:.*-wholenode

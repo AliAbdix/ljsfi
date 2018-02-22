@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+#
+#   (If anyone knows a good freeze program, please let me know!  youssef@bu.edu)  S.Y.
+#
+MAJOR_REQ=2  #major version requirement (greater than or equal to)
+MINOR_REQ=2  #if major version satisfied, minor version requirement (greater than or equal to)
+
+VERBOSE=1                #leave it unset or set it to an empty string for non-verbose mode (no listing steps of building python)
+BUILDOUTPUT='/dev/null'  #file for stdout redirection for wget, gunzip, tar, configure, make, make install; also stderr redirection for wget and make
+                         #    use /dev/fd/0 to send back to stdout (maybe &1 works, too)
+                         #    use /dev/null to suppress
+DEBUG=$1                 #leave this unset or set it to an empty string for no extra debugging messages
+
+#check python existence and version
+GT=0         #0->false->don't have to do anything
+HASPYTHON=0  #so user messages make sense (installing versus upgrading)
+if python -V &> /dev/null; then
+	test "$DEBUG" && echo -n 'Python found...'
+	HASPYTHON=1
+	MAJOR=`python -V 2>&1 | awk '{ print $2 }' | tr '.' ' ' | awk '{ print $1 }'`  #python -V outputs to stderr, so have to redirect to catch it
+	MINOR=`python -V 2>&1 | awk '{ print $2 }' | tr '.' ' ' | awk '{ print $2 }'`
+	if [ $MAJOR_REQ -gt $MAJOR ]; then
+		test "$DEBUG" && echo " but version is too old (major version $MAJOR is too old)."
+		GT=1
+	elif [ $MAJOR_REQ -eq $MAJOR -a $MINOR_REQ -gt $MINOR ]; then
+		test "$DEBUG" && echo " but version is too old (major version $MAJOR is OK, but minor version $MINOR is too old)."
+		GT=1
+	else
+		test "$DEBUG" && echo " version $MAJOR.$MINOR is OK."
+	fi
+else
+	test "$DEBUG" && echo 'Python not found.'
+	GT=1
+fi
+
+#do the updating if necessary
+if [ $GT -eq 1 ] && [ ! -d python/python/bin ]; then
+#	echo ''
+	echo "Pacman requires at least Python version $MAJOR_REQ.$MINOR_REQ."
+	if [ $HASPYTHON -eq 1 ]; then
+		echo "Your Python version, $MAJOR.$MINOR, is too old for Pacman."
+	fi
+#	echo -n "OK to install Python 2.2.3 locally now? [y or n]: "
+#	read ANSWER
+#	ANSWER='y'
+	if [ 1 ]; then
+#		test "$VERBOSE" && echo ''
+#		test "$VERBOSE" && echo 'Downloading and installing Python...'
+#		test "$VERBOSE" && echo '===================================='
+		
+		HERE=`pwd`
+		if [ ! -d python ]; then  #I think this is unnecessary
+			mkdir python          #''
+		fi                        #''
+		cd python                 #''
+		
+		#wget
+		test "$VERBOSE" && echo -n 'Installing Python 2.4.1 locally... '
+		test "$VERBOSE" && echo -n 'Downloading Python 2.4.1... '
+#		if wget http://physics.bu.edu/pacman/python/Python-2.2.3.tgz &> $BUILDOUTPUT
+		if wget http://physics.bu.edu/pacman/python/Python-2.4.1.tgz &> $BUILDOUTPUT
+			then test "$VERBOSE" && echo 'download successful.'
+			else test "$VERBOSE" && echo 'download failed.'; exit 1
+		fi
+		
+		#gunzip
+		test "$VERBOSE" && echo -n 'Unzipping... '
+		if gunzip Python-2.4.1.tgz > $BUILDOUTPUT
+			then test "$VERBOSE" && echo 'unzip successful.'
+			else test "$VERBOSE" && echo 'unzip failed.'; exit 1
+		fi
+		
+		#tar
+		test "$VERBOSE" && echo -n 'Untarring... '
+		if tar xf Python-2.4.1.tar > $BUILDOUTPUT
+			then test "$VERBOSE" && echo 'untar successful.'
+			else test "$VERBOSE" && echo 'untar failed.'; exit 1
+		fi
+
+		mkdir python  #I think this is unnecessary
+		
+		#configure
+		test "$VERBOSE" && echo -n 'Configuring... '
+		cd Python-2.4.1
+		if ./configure --prefix="$HERE/python/python" > $BUILDOUTPUT
+			then test "$VERBOSE" && echo 'configure successful.'
+			else test "$VERBOSE" && echo 'configure failed.'; exit 1
+		fi
+		cd ..
+		
+		#make
+		test "$VERBOSE" && echo -n 'Making Python 2.4.1... '
+		cd Python-2.4.1
+		if make &> $BUILDOUTPUT
+			then test "$VERBOSE" && echo -n 'make successful.'
+			else test "$VERBOSE" && echo 'make failed.'; exit 1
+		fi
+		
+		#make install
+		if make install > $BUILDOUTPUT
+			then test "$VERBOSE" && echo 'make install successful.'
+			else test "$VERBOSE" && echo 'make install failed.'; exit 1
+		fi
+		cd ..
+		
+		/usr/bin/env rm -r -f Python-2.4.1
+		/usr/bin/env rm -f Python-2.4.1.tar
+		
+		echo 'Python 2.4.1 has been built locally.'
+		echo 'Ready to use Pacman.'
+	else
+		if [ $HASPYTHON -eq 1 ]; then
+			echo "Python version not updated."
+		else
+			echo "Python not installed."
+		fi
+		exit 1
+	fi
+elif [ $GT -eq 0 ]; then
+	test "$DEBUG" && echo 'No action taken.'
+else
+	test "$DEBUG" && echo 'Using Python 2.4.1 from the Pacman installation area.'
+fi
+
+exit 0

@@ -1,0 +1,6 @@
+#!/bin/sh
+
+source /cvmfs/atlas.cern.ch/repo/sw/agis/x86_64-slc5-gcc43-opt/1.1.2/setup.sh
+agis-cvmfs.py $@
+
+exit $?

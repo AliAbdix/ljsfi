@@ -1,0 +1,9 @@
+Executable = "gbb";
+InputSandbox = {"@SCRIPTPATH@/deploy-dbrelease.sh","@TOOLSPATH@/dq.tar.gz","@SCRIPTPATH@/gbb"};
+OutputSandbox = {"stdout", "stderr"};
+stdoutput = "stdout";
+stderror = "stderr";
+Arguments = "--timing -v -m 300 -p -D 600 -s @GBB_SURL@ -c 1 $PWD/deploy-dbrelease.sh RELEASE DB_REL @SITE_CENAME@";
+Environment = {"PACMAN_VER=@PACMANVERSION@","LCG_CATALOG_TYPE=@LCGCATALOGTYPE@","LFC_HOST=@LFCHOST@"};
+VirtualOrganisation = "atlas";
+Requirements = other.GlueCEUniqueId=="@SITE_CS@";

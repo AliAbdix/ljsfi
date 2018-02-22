@@ -1,0 +1,4 @@
+#
+#    Sample Package
+#
+message("B 4")

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<install>
+<swmgr type="INFO" datetime="2014-01-17 15:01:48">Initial umask: 0022</swmgr>
+<swmgr type="INFO" datetime="2014-01-17 15:01:48">This site is configured for SGM static accounts. Setting umask to g-w,o-w,a+rx</swmgr>
+<swmgr type="INFO" datetime="2014-01-17 15:01:48">Using umask 0022</swmgr>
+<swmgr type="INFO" datetime="2014-01-17 15:01:48">Self-generated snapshot name: atlas-nightly-cvmfsnightly-all-1-rh73-opt</swmgr>
+<swmgr type="INFO" datetime="2014-01-17 15:01:48">=======================</swmgr>
+<swmgr type="INFO" datetime="2014-01-17 15:01:48">Resource info</swmgr>
+<swmgr type="INFO" datetime="2014-01-17 15:01:48">Timestamp: Fri Jan 17 15:01:48 CET 2014</swmgr>
+<swmgr type="INFO" datetime="2014-01-17 15:01:48">Running as: desalvo</swmgr>
+<swmgr type="INFO" datetime="2014-01-17 15:01:48"> uid=24694(desalvo) gid=1307(atlas) groups=1307(atlas),5000(atlasonline),5002(atlassw)</swmgr>
+<swmgr type="INFO" datetime="2014-01-17 15:01:48">Running on: Linux atlas-ui-04.roma1.infn.it 2.6.18-371.3.1.el5 #1 SMP Thu Dec 5 11:39:02 CST 2013 x86_64 x86_64 x86_64 GNU/Linux</swmgr>
+<swmgr type="INFO" datetime="2014-01-17 15:01:48">Shell: /bin/bash</swmgr>
+<swmgr type="INFO" datetime="2014-01-17 15:01:48">Description: Scientific Linux SL release 5.7 (Boron)</swmgr>
+<swmgr type="INFO" datetime="2014-01-17 15:01:48">=======================</swmgr>
+<swmgr type="INFO" datetime="2014-01-17 15:01:48">I will not download pacman since we are using pacballs or pacman has been disabled.</swmgr>
+<swmgr type="INFO" datetime="2014-01-17 15:01:49">Saving the installation environment in /tmp/sw-mgr-envstart.tmp.2322</swmgr>
+<swmgr type="INFO" datetime="2014-01-17 15:01:49">Running on cvmfs filesystem</swmgr>
+<swmgr type="INFO" datetime="2014-01-17 15:01:49">No ATLAS_LOCAL_AREA defined</swmgr>
+<swmgr type="WARNING" datetime="2014-01-17 15:01:49">Cannot determine the DB area while running on cvmfs</swmgr>
+<swmgr type="INFO" datetime="2014-01-17 15:01:49">Skipping the installation since we are on cvmfs filesystem and/or no local override area was specified</swmgr>
+<swmgr type="INFO" datetime="2014-01-17 15:01:49">Resetting the environment from /tmp/sw-mgr-envstart.tmp.2322</swmgr>
+<swmgr type="INFO" datetime="2014-01-17 15:01:49">Software release path not found: /cvmfs/atlas-nightlies.cern.ch/repo/sw/nightlies/i686-slc5-gcc436-opt</swmgr>
+<swmgr type="WARNING" datetime="2014-01-17 15:01:49">Software release path not found: /cvmfs/atlas-nightlies.cern.ch/repo/sw/i686-slc5-gcc436-opt</swmgr>
+<swmgr type="ERROR" datetime="2014-01-17 15:01:49">No directory /cvmfs/atlas-nightlies.cern.ch/repo/sw/nightlies/i686-slc5-gcc436-opt found</swmgr>
+<swmgr type="ERROR" datetime="2014-01-17 15:01:49">Test FAILED [rc=1]</swmgr>
+<swmgr type="INFO" datetime="2014-01-17 15:01:49">Removing test data</swmgr>
+<swmgr type="INFO" datetime="2014-01-17 15:01:49">Reverting to the environment from /tmp/sw-mgr-envlast.tmp.2322</swmgr>
+<swmgr type="INFO" datetime="2014-01-17 15:01:50">Removing temporary environment file /tmp/sw-mgr-envstart.tmp.2322</swmgr>
+<swmgr type="EXIT" datetime="2014-01-17 15:01:50">1</swmgr>
+<swmgr type="ERROR" datetime="2014-01-17 15:01:50">Processing FAILED</swmgr>
+</install>

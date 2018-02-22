@@ -1,0 +1,8 @@
+Executable = "sw-mgr";
+InputSandbox = {"@SCRIPTPATH@/sw-mgr","@SCRIPTPATH@/getFrontierEnv.py","@SCRIPTPATH@/lcg-tags","@SCRIPTPATH@/dq2.cfg"};
+OutputSandbox = {"stdout", "stderr", "install.xml"};
+stdoutput = "stdout";
+stderror = "stderr";
+Arguments = "-i @RELNAME@ -p @PHYSICALPATH@ --validate --ddm-setup $VO_ATLAS_SW_DIR/ddm/latest/setup.sh --poolcond-pattern @SWNAME@ --host @TAGHOST@ --subcluster @SCNAME@ --grid-name @GRIDNAME@ --goc-name @GOCNAME@ --vo atlas --require-shfs --disk-free @DISKSPACE@ --add-tags --rm-tags-on-fail --tags @RELTAG@ -T poolcond --release-setup $VO_ATLAS_SW_DIR/prod/releases --xml install.xml --local-config $VO_ATLAS_SW_DIR/local --site-config $VO_ATLAS_SW_DIR/AtlasSiteConfig.sh --poolcond-copy";
+VirtualOrganisation = "atlas";
+Requirements = other.GlueCEUniqueId=="@SITE_CS@";

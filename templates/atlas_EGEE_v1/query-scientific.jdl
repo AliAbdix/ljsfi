@@ -1,0 +1,6 @@
+Executable = "/bin/hostname";
+OutputSandbox = {"stdout","stderr"};
+stdoutput = "stdout";
+stderror = "stderr";
+VirtualOrganisation = "atlas";
+Requirements = (other.GlueCEStateStatus == "Production" && RegExp("Scientific.*",other.GlueHostOperatingSystemName));

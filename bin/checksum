@@ -1,0 +1,4 @@
+#!/bin/sh
+rm -f MD5SUM
+\find bin ddl etc ext extra lib scripts templates tools www setup.sh -type f -a ! -name "*.tar.gz" -a ! -name "*.tgz" -a ! -name "*.pyc" -a ! -name "atlas_install*.dump.gz" -exec md5sum {} \; >> MD5SUM
+exit

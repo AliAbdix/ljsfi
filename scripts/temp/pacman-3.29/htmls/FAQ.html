@@ -1,0 +1,36 @@
+<title>FAQ</title>
+<body background="sky.gif">
+<p>
+<h1><font color=navy>FAQ</font></h1>
+<p>
+<hr size=5>
+<p>
+<ol>
+<h2><li>How do I get help or report bugs?</h2><br>
+Questions, bug reports, suggestions and ideas are always welcome by email to 
+<a href="mailto:youssef@bu.edu">Saul Youssef</a>.  
+<h2><li>Is Pacman 3 compatible with previous versions of Pacman?</h2><br>
+Yes, all the existing Pacman 2 caches will work as they are.  You cannot,
+however, add Pacman 3 packages to an existing Pacman 2 installation.  Instead,
+you should re-install with Pacman 3.
+<h2><li>Where is the list of symbolic cache names?  Can I modify it?</h2><br>
+Do <b>% pacman -registry</b> to see the default list of symbolic cache names.
+Authors of Pacman packages can define their own names which are added to your registry when you install
+the software.  See the documentation for the <b>register</b> atom of the Pacman language for more
+details.
+<h2><li>Does Pacman modify files outside of the installation directory
+tree?</h2><br>
+Packages usually keep to the good practice of staying within the directory tree
+that Pacman creates for them.  In general, however, a package may modify files
+outside of it's directory tree.  Because of this, you should always use <b>% pacman -remove</b> to remove
+packages rather than doing <b>% rm -r -f </b>.
+<h2><li>Am I allowed to modify and re-distribute Pacman?</h2><br>
+Not without explicit permission from Saul Youssef.  See <b>% pacman
+-license</b> for the details.
+  
+</ol>
+<p>
+<hr size=5>
+<h3><a href="http://physics.bu.edu/pacman/" target="_blank">Pacman Headquarters</a></h3>
+<p>
+</body>

@@ -1,0 +1,32 @@
+# Function to submit jobs
+submitJDL()
+{
+  JDL="$1"; shift
+
+  JOBFILE=`basename $JDL | sed "s/.jdl/.$$.job/"`
+  JOBPATH=`dirname $JDL`/../jobs
+  mkdir -p $JOBPATH
+  
+  ljsfinfo.py --set-lock --jdlname="`basename $JDL`"
+  if [ $? == 0 ] ; then
+    gbb -l 300 $LJSF_JOBSUBMIT $CONFIGVO $JDL 2>&1 > $JOBPATH/$JOBFILE
+    JOBID="`cat $JOBPATH/$JOBFILE 2>/dev/null | grep "^[ -]*https" | sed 's/^ - //g' | awk '{print $1}'`"
+    arch="`grep arch $JOBPATH/$JOBFILE 2>/dev/null | cut -d '"' -f 2 | sed 's/arch=-//g'`"
+    [ "$arch" != "" ] && arch="--arch $arch"
+    if [ "$JOBID" != "" ] ; then
+      ljsfbkk.py --insert --jobid="$JOBID" --jobname="$JOBFILE" \
+                 --validation="pending" --jdlname="`basename $JDL`" \
+                 --jdlfile="$JDL" \
+                 --subtime="`date +'%Y-%m-%d %H:%M:%S'`" $arch $REQID_OPT $ADMINID
+      echo "$JDL submitted (jobfile: $JOBPATH/$JOBFILE)"
+    else
+      ljsfinfo.py --remove-lock --jdlname="`basename $JDL`"
+      echo "Failed to submit $JDL"
+      cat $JOBPATH/$JOBFILE
+      rm -f $JOBPATH/$JOBFILE
+      exit 2
+    fi
+  else
+    exit $?
+  fi
+}

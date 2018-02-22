@@ -1,0 +1,70 @@
+#!/usr/bin/perl
+########################################
+# Show a list of sites not yet installed
+# J. Kennedy - 2006
+# LJSF framework v1.5
+
+if ( scalar(@ARGV) != 1) {
+    print "Usage ./show-noninstalled-sites sw.version.number\n";
+    print " e.g. ./show-noninstalled-sites 11.0.42\n";
+    exit 1;
+}
+
+
+$INFOCMD   = "$ENV{LCG_LOCATION}/bin/lcg-info --vo atlas --bdii atlas-bdii.cern.ch:2170 --list-ce";
+$INFOATTRS = "--attrs TotalCPUs,MaxCPUTime";
+
+open (INFO, "$INFOCMD $INFOATTRS|") || die ("Cannot get CE informations");
+@list = ();
+@info = ();
+%res  = {};
+while (<INFO>) {
+    @list = split;
+    if (/CE:/) { $CE=$list[2]; }
+    if (/TotalCPUs/) { $CPU=$list[2]; }
+    if (/MaxCPUTime/) { $MAXCPUTIME=$list[2]; }
+    if ($#list<1 and $MAXCPUTIME > 2000) {
+        ($CEHOST) = split(/:/,$CE);
+        if (not defined $res{$CEHOST}) {
+            $res{$CEHOST} = "$CPU,$CE";
+        }
+    }
+}
+close (INFO);
+
+@resources=();
+%cpus = {};
+foreach $key (sort { $res{$b} <=> $res{$a} } keys %res) {
+    ($CPU,$CE) = split(',',$res{$key});
+    ($CEHOST) = split(/:/,$CE);	
+    $cpus{$CEHOST}=$CPU;	
+    if ($CPU > 0) { push(@resources,$CEHOST); }
+}
+
+# get list of sites being installed from installation db
+$release=$ARGV[0];
+
+open (INST, "ljsfinfo.py --select=site.cename --rel=$release|") || die ("Cannot get Install information");
+@runninglist = ();
+while (<INST>) {
+    if (/\|\s*(\S*)/) { push(@runninglist,$1);}
+}
+close (INST);
+
+my %seen;
+my @only;
+
+@seen{@runninglist} = ();
+
+foreach $site (@resources) {
+    push(@only, $site) unless exists $seen{$site};
+}
+
+print ":Remaining Resources:\n";
+print "cpu's::Resource\n";
+open (OUT,"|sort -n ") || die ("Cannot pipe to sort");
+foreach $resource (@only) {
+    print OUT "$cpus{$resource} $resource\n";
+}
+close(OUT);
+exit;

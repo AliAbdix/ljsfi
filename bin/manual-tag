@@ -1,0 +1,58 @@
+#!/bin/sh
+showhelp()
+{
+  echo "Usage: `basename $0` [OPTIONS]"
+  echo "       OPTIONS:"
+  echo "          -h|--help                    Show this help."
+  echo "          -r|--release <rel>           Tag release <rel>"
+  echo "          -R|--resource <res>          Tag resource <res>"
+  exit 0
+}
+
+timeout () {
+    perl -e 'alarm shift; exec @ARGV' "$@";
+}
+
+TAGTASK="validation"
+
+OPTS=`getopt -o hr:R: -l help,release:,resource: -- "$@"`
+if [ $? != 0 ] ; then echo "Terminating..."; exit -1 ; fi
+eval set -- "$OPTS"
+while true ; do
+        case "$1" in
+                -h|--help)         showhelp; shift;;
+                -r|--release)      RELEASE="$2"; shift 2;;
+                -R|--resource)     RESOURCE="$2"; shift 2;;
+                --)                shift ; break ;;
+                \?)                break ;
+                exit ;;
+        esac
+done
+
+if [ -z "$RESOURCE" ] ; then
+    echo "No resource specified"
+    exit 1
+fi
+
+if [ -z "$RELEASE" ] ; then
+    echo "No release specified"
+    exit 1
+fi
+
+TMPDUMP="/tmp/manual-tag.$$.tmp"
+
+timeout 300 ljsf-infosys --info --panda-resource $RESOURCE --cache --cache-timeout 7200 &> $TMPDUMP
+SITENAME="`cat $TMPDUMP | grep '^SITENAME=' | tail -n 1 | cut -d= -f 2`"
+GRIDNAME="`cat $TMPDUMP | grep '^GRID=' | tail -n 1 | cut -d= -f 2`"
+if [ -n "$SITENAME" -a -n "$GRIDNAME" ] ; then
+    ljsfreq.py --cs=$RESOURCE --rel=$RELEASE --reqtype=validation --sitename=$SITENAME --status=done --grid-name=$GRIDNAME --comments="Manual tag"
+    ljsfinfo.py --rel=$RELEASE --cs=$RESOURCE --status=installed
+    agis-tags --add --rel=$RELEASE --panda-resource=$RESOURCE
+else
+    echo "Cannot find Sitename or GridName for resource $RESOURCE"
+fi
+
+#Cleanup
+rm -f $TMPDUMP
+
+exit

@@ -1,0 +1,26 @@
+#!/bin/sh
+
+#Check the DB status
+$BINPATH/dbcheck
+rc=$?
+[ $rc -ne 0 ] && exit $rc
+
+jobname="$1"
+val="$2"
+comments="$3"
+
+if [ "$jobname" == "" -o "$val" == "" ] ; then
+  echo "Usage: `basename $0` <job name> <validation status> [<comments>]"
+  exit -1
+fi
+
+jobid="`ljsfbkk.py --select=job.id --validation=pending --jobname=$jobname --quiet`"
+if [ "$comments" == "" ] ; then
+  ljsfbkk.py --insert --jobid="$jobid" --validation="$val"
+else
+  ljsfbkk.py --insert --jobid="$jobid" --validation="$val" \
+                   --jobcomments="$comments"
+fi
+[ "$?" == 0 ] && echo "Validation for job id $jobid set to '$val'"
+
+exit

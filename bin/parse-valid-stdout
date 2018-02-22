@@ -1,0 +1,16 @@
+#!/bin/bash
+###########################
+# Parse a valid stdout
+# J. Kennedy - 2006
+# LJSF framework v1.5
+
+
+if [ -s stdout ];then
+    egrep  '\[ .*OK.* |FAIL|PASSED' stdout
+else
+    if [ -s stdout.gz ];then
+	zcat stdout.gz | egrep  '\[ .*OK.* |FAIL|PASSED'
+    else
+	echo "No stdout file found"	
+    fi	
+fi

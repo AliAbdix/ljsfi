@@ -1,0 +1,61 @@
+#########################################################
+#                   LJSFi local setup                   #
+#                LJSFi 1.9.2 - 20100107                 #
+# Alessandro De Salvo <Alessandro.DeSalvo@roma1.infn.it #
+#########################################################
+
+export LJSFAGENTCERT=@LJSFAGENTCERT@
+export LJSFAGENTKEY=@LJSFAGENTKEY@
+
+# Grid certificates
+export X509_CERT_DIR=${X509_CERT_DIR:-/etc/grid-security/certificates}
+
+# Your VO name
+export VO=@VO@
+
+# Your voms parameters
+export VOMS="@VOMS@"
+
+# The authentication type:
+# 'grid'         -> certificate-based auth
+# 'voms'         -> VOMS-based auth
+# 'myproxy:grid' -> certificate-based auth with myproxy server
+# 'myproxy:voms' -> VOMS-based auth with myproxy server
+# 'grid:voms'    -> VOMS-based auth with long grid proxy
+export LJSFAUTHTYPE=@LJSFAUTHTYPE@
+
+# Catalog type
+export LCG_CATALOG_TYPE=@LCG_CATALOG_TYPE@
+
+# LFC setup
+export LFC_HOST=@LFC_HOST@
+
+# Installation DB
+export LJSFDBNAME="@LJSFDBNAME@"
+export LJSFDBURL="@LJSFDBURL@"
+
+# Minimum proxy time left before LJSF will automatically ask
+# to renew it, in seconds
+export LJSF_MINPROXY_LT=@LJSF_MINPROXY_LT@
+# Maximum proxy life time in seconds
+export LJSF_MAXPROXY_LT=@LJSF_MAXPROXY_LT@
+# Maximum myproxy life time in hours
+export LJSF_MAXMYPROXY_LT=@LJSF_MAXMYPROXY_LT@
+# Maximum grid proxy lifetime in hours
+export LJSF_MAXGRIDPROXY_LT=@LJSF_MAXGRIDPROXY_LT@
+
+# Myproxy server
+export LJSF_MYPROXYSERVER=@LJSF_MYPROXYSERVER@
+
+# Globus hostname (needed for UIs behind a natting firewall)
+# Globus TCP port range
+# Put here the name of the front-end machine and the port range
+# or comment them out
+export GLOBUS_HOSTNAME=`/bin/hostname`
+export GLOBUS_TCP_PORT_RANGE="20000,25000"
+
+# SURL to be used for partial output dump by GriBB
+export GBB_SURL="@GBB_SURL@"
+
+# Custom setup
+[ -s "$CONFPATH/ljsfcustom.conf" ] && source $CONFPATH/ljsfcustom.conf

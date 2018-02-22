@@ -1,0 +1,141 @@
+#!/bin/sh
+
+##############################################################
+# System V-style script for autoget agent management         #
+#                                                            #
+# (c) Alessandro De Salvo <Alessandro.DeSalvo@roma1.infn.it> #
+#     16 Nov 2005                                            #
+##############################################################
+
+CMD=$1
+shift 1
+
+PIDFILE=$LJSFVARPATH/autoget-`uname -n`.pid
+PIDRUNNING="`\ls -d $LJSFVARPATH/autoget-*.pid 2> /dev/null`"
+
+C_NORMAL="\\033[0;39m"
+C_FAILURE="\\033[1;31m"
+C_SUCCESS="\\033[1;32m"
+
+start() {
+    check-proxy
+    retcode=$?
+    [ $retcode -ne 0 ] && exit $retcode
+    printf "${C_NORMAL}%-30s" "Starting AutoGet agent"
+    if [ "$PIDRUNNING" == "" ] ; then
+      autoget.py $@
+      RETVAL=$?
+      if [ $RETVAL -eq 0 ] ; then
+        printf "[${C_SUCCESS}  OK  ${C_NORMAL}]\n"
+      else
+        printf "[${C_FAILURE}FAILED${C_NORMAL}]\n"
+      fi
+    else
+      printf "[${C_FAILURE}FAILED${C_NORMAL}]\n"
+      RUNHOST="`basename $PIDRUNNING | sed -e 's#^autoget-##' -e 's#.pid$##'`"
+      printf "AutoGet agent already running on %s\n" $RUNHOST
+      printf "Please stop it before or delete the file\n"
+      printf "%s\n" $PIDRUNNING
+      printf "if you think that no agent is running.\n"
+      RETVAL=-1
+    fi
+    return $RETVAL
+}
+
+status() {
+    if [ "$PIDRUNNING" != "" ] ; then
+      RUNHOST="`basename $PIDRUNNING | sed -e 's#^autoget-##' -e 's#.pid$##'`"
+      PID="`cat $PIDRUNNING`"
+      if [ "$RUNHOST" == "`uname -n`" ] ; then
+        if [ "`ps | grep $PID`" != "" ] ; then
+          printf "AutoGet agent not running. Removing PID file %s\n" $PIDRUNNING
+          rm -f $PIDRUNNING
+          RETVAL=1
+        else
+          printf "AutoGet agent running on this node with PID=%d\n" $PID
+          RETVAL=0
+        fi
+      else
+        printf "AutoGet agent running on node %s with PID=%d\n" $RUNHOST $PID
+        RETVAL=0
+      fi
+    else
+      printf "AutoGet agent not running.\n"
+    fi
+    return $RETVAL
+}
+
+
+stop() {
+    printf "${C_NORMAL}%-30s" "Stopping AutoGet agent"
+    if [ -f $PIDFILE ] ; then
+      if [ -s "$PIDFILE" ] ; then
+        PID="`cat $PIDFILE`"
+        if [ "$PID" != "" ] ; then
+          while [ "`ps hp $PID`" != "" ] ; do
+            kill $PID &> /dev/null
+            sleep 1s
+          done
+        fi
+        RETVAL=0
+        printf "[${C_SUCCESS}  OK  ${C_NORMAL}]\n"
+      else
+        RETVAL=1
+        printf "[${C_FAILURE}FAILED${C_NORMAL}]\n"
+      fi
+      rm -f $PIDFILE
+    else
+      RETVAL=1
+      printf "[${C_FAILURE}FAILED${C_NORMAL}]\n"
+      printf "No AutoGet agent running on this node\n"
+    fi
+    return $RETVAL
+}
+
+
+killProc() {
+    printf "${C_NORMAL}%-30s" "Killing AutoGet agent"
+    if [ -f $PIDFILE ] ; then
+      if [ -s "$PIDFILE" ] ; then
+        PID="`cat $PIDFILE`"
+        if [ "$PID" != "" ] ; then
+          while [ "`ps hp $PID`" != "" ] ; do
+            kill -9 $PID &> /dev/null
+            sleep 1s
+          done
+        fi
+        RETVAL=0
+        printf "[${C_SUCCESS}  OK  ${C_NORMAL}]\n"
+      else
+        RETVAL=1
+        printf "[${C_FAILURE}FAILED${C_NORMAL}]\n"
+      fi
+      rm -f $PIDFILE
+    else
+      RETVAL=1
+      printf "[${C_FAILURE}FAILED${C_NORMAL}]\n"
+      printf "No AutoGet agent running on this node\n"
+    fi
+    return $RETVAL
+}
+
+
+case "$CMD" in
+    start)
+        start $@
+        ;;
+    status)
+        status
+        ;;
+    stop)
+        stop
+        ;;
+    killproc)
+        killProc
+        ;;
+    *)
+        echo $"Usage: $0 {start|stop|killproc|status} [cmd]"
+        RETVAL=1
+esac
+
+exit $RETVAL

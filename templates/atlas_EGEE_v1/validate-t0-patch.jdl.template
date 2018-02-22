@@ -1,0 +1,9 @@
+Executable = "sw-mgr";
+InputSandbox = {"SCRIPTPATH/sw-mgr","SCRIPTPATH/gbb","SCRIPTPATH/lcg-tags"};
+OutputSandbox = {"stdout", "stderr", "install.xml"};
+stdoutput = "stdout";
+stderror = "stderr";
+Arguments = "-i RELNAME -l LOGPATH/RELMAIN -p PHYSPATH/VERSIONAREA -o --use-grid --grid-name GRIDNAME --replicate --release-ver REVISIONVER --host CENAME --subcluster SCNAME --vo atlas --require-shfs --disk-free DISKSPACE --add-tags --tags RELTAG --force-tags -P SWNAME --require-prj REQPRJ -T t0patch -t ARCH -O opt -m PACMANVERSION --dump-tags $VO_ATLAS_SW_DIR/tags --xml install.xml --dbrelease-clean KV_POST_OPT KITCACHE DBREL";
+Environment = {"LCG_CATALOG_TYPE=LCGCATALOGTYPE","LFC_HOST=LFCHOST"};
+VirtualOrganisation = "atlas";
+Requirements = other.GlueCEUniqueId=="CEID";

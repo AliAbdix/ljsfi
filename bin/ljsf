@@ -1,0 +1,53 @@
+#!/bin/bash
+
+help()
+{
+  echo "Usage: `basename $0` [OPTIONS] <set|get|del> <command> [<command-options>]"
+  echo "       OPTIONS:"
+  echo "            -h|--help           Display this help"
+  echo "            -t|--timeout <s>    Set connect timeout"
+  exit 0
+}
+
+timeout () {
+    perl -e 'alarm shift; exec @ARGV' "$@";
+}
+
+CCTO=300
+
+# Get the command line options
+OPTS=`getopt -o ht: -l help,timeout: -- "$@"`
+if [ $? != 0 ] ; then echo "Terminating..."; exit -1 ; fi
+eval set -- "$OPTS"
+while true ; do
+        case "$1" in
+                -h|--help)         help; shift;;
+                -t|--timeout)      CCTO="$2"; shift 2;;
+                --)                shift ; break ;;
+                \?)                break ;
+                exit ;;
+        esac
+done
+
+OPERAND=$1
+CMD=$2
+CMDMODE=$3
+shift 3
+CMDOPTS="`for var in "$@"; do echo "$var" | sed 's/ /%20/g'; done | sort -u | sed 's/ /\&/g'`"
+CMDOPTS="`echo $CMDOPTS | sed 's/ /\&/g'`"
+case $OPERAND in
+    get|GET)     REST_OP="GET";;
+    set|SET)     REST_OP="PUT";;
+    del|DEL)     REST_OP="DELETE";;
+    \?)          break;
+    exit;;
+esac
+    
+#creates a new file descriptor 3 that redirects to 1 (STDOUT)
+exec 3>&1
+IDENT="`id -un`@`hostname -f`"
+CURL_URL="$LJSFDBURL/exec/${CMD}.php?ident=${IDENT}&mode=${CMDMODE}"
+[ -n "${CMDOPTS}" ] && CURL_URL="${CURL_URL}&${CMDOPTS}"
+
+HTTP_STATUS=$(curl -w "%{http_code}" -o >(cat >&3) -S -s --connect-timeout $CCTO -X ${REST_OP} --capath $X509_CERT_DIR --cert $X509_USER_PROXY --key $X509_USER_PROXY "$CURL_URL")
+[ $HTTP_STATUS -eq 200 ] && exit 0 || exit $HTTP_STATUS

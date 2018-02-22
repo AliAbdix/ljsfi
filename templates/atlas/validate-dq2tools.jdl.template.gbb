@@ -1,0 +1,9 @@
+Executable = "gbb";
+InputSandbox = {"@SCRIPTPATH@/sw-mgr","@SCRIPTPATH@/gbb","@SCRIPTPATH@/lcg-tags","@SCRIPTPATH@/dq2tools.validate"};
+OutputSandbox = {"stdout", "stderr", "install.xml"};
+stdoutput = "stdout";
+stderror = "stderr";
+Arguments = "--timing -v -m 300 -p -D 600 -s @GBB_SURL@ sw-mgr -i @RELNAME@ -l @LOGICALPATH@/latest -p @PHYSICALPATH@/@VERSIONAREA@ -o --validate --use-grid --grid-name @GRIDNAME@ --replicate --snapname @PACKAGE@ --release-ver @SWREVISION@ --host @TAGHOST@ --vo atlas --require-shfs --disk-free @DISKSPACE@ --add-tags --tags @RELTAG@ -P @SWNAME@ -T ext -t @ARCH@ -O opt -m @PACMANVERSION@ --xml install.xml --site-config $VO_ATLAS_SW_DIR/AtlasSiteConfig.sh --no-version --setenv DQ2_LOCAL_SITE_ID=@SITE_ALIAS@ --validation-exe dq2tools.validate @KITCACHE@";
+Environment = {"LCG_CATALOG_TYPE=@LCGCATALOGTYPE@","LFC_HOST=@LFCHOST@"};
+VirtualOrganisation = "atlas";
+Requirements = other.GlueCEUniqueId=="@SITE_CS@";

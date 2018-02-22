@@ -1,0 +1,40 @@
+<title>The full package specification syntax</title>
+<body background="sky.gif">
+<p>
+<h1><font color=navy>The full package specification syntax</font></h1>
+<p>
+<hr size=5>
+<p>
+If you do <b>% pacman -help</b>, you'll see that the general form of the command line in Pacman is basically a
+switch like <b>-get</b> or <b>-fetch</b> followed by a list of package specifications like <b>BU:Python</b>. 
+The general form of such a package specification is
+<p>
+<h3><font color="#8B0000">{Cache1}:{Cache2}:{Cache3}:...:{CacheN}:{SubdirectoryPath}{Package} | {requirements}</font></h3>
+<p>
+where 
+<ol>
+<li><b><font color="#8B0000">{Cach1}:{Cach2}:{Cach3}:...:{CacheN}:</font></b> is an optional cache specification.  A cache can be 
+<ul>
+<li> A symbolic name like <b>BU</b>, <b>Pacman</b> or <b>VDT</b>.
+<li> A URL of a directory on a remote file system like <b>http://physics.bu.edu/pacman/sample_cache/</b>.
+<li> A location in your local file system containing Pacman source code.
+<li> An SSH address of a directory on a remote file system <b>youssef@physics.bu.edu:~youssef/cache</b> containing source code.
+<li> The location of a file with extension <b>.caches</b> containing a list of caches either locally, as a URL or SSH file specification.
+<li> The location of a snapshot file with extension <b>.snap</b> either locally, as a remote URL or SSH file specification.
+</ul>
+<p>
+<li><b><font color="#8B0000">{SubdirectoryPath}</font></b> is an optional subdirectory path which can be used for source caches.  If, for
+example, you have a source cache FooCache and have package Foo in file Foo.pacman in subdirectory foostuff, you can refer to this as
+<b>FooCache:foostuff/Foo</b>.
+<p>
+<li><b><font color="#8B0000">{Package}</font></b> is a package name like <b>Python</b> or the name of a Pacman source code file like <b>Python.pacman</b>.
+<p>
+<li>The optional <b><font color="#8B0000">| {requirements}</font></b> is any expression in the Pacman language which the package in question must satisfy.  Typical expressions are
+<b>version('1.0')</b>, <b>versionGE('1.2'); versionLE('1.4')</b>, <b>tag('graphics'); { version('1.0') OR versionGE('1.3')}</b>.
+</ol>
+If you don't specify any caches, Pacman searches the caches in your <b>trusted.caches</b> file in order.
+
+<hr size=5>
+<h3><a href="http://physics.bu.edu/pacman/" target="_blank">Pacman Headquarters</a></h3>
+<p>
+</body>

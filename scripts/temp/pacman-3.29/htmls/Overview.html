@@ -1,0 +1,420 @@
+<title>Language reference</title>
+<body background="sky.gif">
+
+<p>
+<h1><font color=navy>Language reference</font></h1>
+<p>
+<hr size=5>
+<p>
+<h2><font color=navy>Basics</font></h2>
+<p>
+<dl>
+<dt><font color=navy>download <i>(FILE)</i>, downloadUntar <i>(FILE[,env])</i>, downloadUntarZip <i>(FILE[,env])</i>, untarzip
+<i>(FILE[,env])</i></font></dt>
+<dd>These atoms are used to download files to the current working directory.  The <i>FILE</i> argument may be a full URL or a file
+specified with SSH syntax or a file specified relative to a symbolic cache name or a local file.  Here are examples all downloading
+the same file
+<ul>
+<li> download ('http://atlas.bu.edu/caches/tarballs/foo.tar.gz')
+<li> download ('youssef@atlas.bu.edu:/caches/tarballs/foo.tar.gz')
+<li> download ('BU/tarballs/foo.tar.gz')
+<li> download ('/atlasgrid/caches/tarballs/foo.tar.gz')
+</ul>
+The optional <i>env</i> argument causes Pacman to set an environment variable to the full path of the top level untarred directory.
+The download atom simply downloads; downloadUntar and downloadUntarZip are identical and both automatically untar and unzip as
+necessary. Pacman guarantees that untarring does not overwrite existing files unless you override this feature with <b>-allow
+tar-overwrite</b>.
+</dd>
+<p>
+<dt><font color=navy>setenv <i>(env, val)</i>, setenvTemp <i>(env, val)</i>, envIsSet <i>(env)</i>, envHasValue <i>(env, value)</i>,
+envHasValueTemp <i>(env, value)</i></font></dt>
+<dd>These atoms let you set and test environment variables:
+<ul>
+<li> setenv <i>(env, val)</i> assigns environment variable the value <i>val</i>.  Pacman both guarantees that the environment variable
+that you set maintains it's value independent of any other packages and it also guarantees this value in setup scripts that Pacman
+generates.
+<li> envIsSet <i>(env)</i> requires that the environment variable has been set.
+<li> envHasValue <i>(env, value)</i> requires that the environement variable has been set to the value <i>value</i> and guarantees
+that this is true
+</ul>
+setenvTemp and envHasValueTemp differ from their non-temp versions in that they do not guarantee a permanent condition and do not
+get put setup scripts.
+</dd>
+<p>
+<dt><font color=navy>path <i>(val[,env])</i></font></dt>
+<dd>path <i>(value,[,env])</i></dd> let's you add directories to standard unix path searching variables like the standard PATH and
+LD_LIBRARY_PATH.  <i>env</i> defaults to PATH.  Pacman checks that the directories specified exists and guarantees that file 
+in directories added this way are consistent.  If, for
+example, you do <i>path('/usr/bin/')</i> and <i>path('/usr/local/bin')</i> and both contain the file <i>python</i>, Pacman will report an error.  This
+guarantees that as an author of a Pacman package files that you add to paths are maintained independent of other packages.
+<p>
+<dt><font color=navy>mkdir <i>(path)</i>, mkdirPersistent <i>(path)</i></font></dt>
+<dd>mkdir (<i>path</i>) makes a new directory and checks it's existence over time.  When a package containing mkdir is uninstalled, the
+directory and it's contents are removed by Pacman.  mkdirPersistent remains after a package is uninstalled.</dd>
+<p>
+<dt><font color=navy>message <i>(text)</i>, echo <i>(text)</i></font></dt>
+<dd>Either of these prints a message.</dd>
+<p>
+<dt><font color=navy>cd <i>(path)</i>, cu <i>(username)</i></font></dt>
+<dd>cd <i>(path)</i> has the same effect as <b>% cd path</b> as a unix shell command.  cd <i>()</i> undoes the previous cd command.
+Similarly, cu <i>(username)</i> changes the username of the installing process and cu <i>()</i> undoes the previous username change.  cu
+only works if the installer is the superuser.</dd>
+<p>
+<dt><font color=navy>yes <i>(question)</i>, no <i>(question)</i>, choice <i>(option, question, opt1, opt2...),
+fail(<i>message</i>)</i></font></dt>
+<dd>Atoms <i>yes</i>, <i>no</i> and <i>choice</i> let you as questions at installation time and remember the answers for future
+installations.  This is typically used with OR branching to have a package.  For example,
+<pre><b><font color="#8B0000"> { yes('Do you want to print "FOO"?'); message('FOO') OR message('not printing FOO') }
+</font></pre></b>
+shows how to use <i>yes</i> to ask a question and follow the first branch if the answer is 'yes'.  Similarly, <i>no</i> is satisfied as a
+logical condition if the answer to the question is 'no'.  You can use choice when there are multiple possibilities as in
+<b><pre><font color="#8B0000"> { choice(  'Red','Choose a color','Red','Green','Blue'); message('Red chosen'  ) OR
+   choice('Green','Choose a color','Red','Green','Blue'); message('Green chosen') OR 
+   choice( 'Blue','Choose a color','Red','Green','Blue'); message('Blue chosen' ) }
+</font></pre></b>
+Use fail(<i>message</i>) to cause an installation to fail with an error message as in
+<b><pre><font color="#8B0000"> { yes('OK to make a new directory?'); mkdir('foo') OR fail('No permission to make foo.') }
+</font></pre></b>
+all of these atoms save and remember the answers provided, so that the answers don't have to be repeated when the
+software is updated or removed and re-installed.  The installer can always choose to ignore this saved information
+by using <b>-ignore-cookies</b>.
+<p>
+</dd>
+<dt><font color=navy>which <i>(filename)</i></font></dt>
+<dd>which tests that <i>filename</i> is in the user's standard PATH as in the familiar unix command.</dd>
+<p>
+<dt><font color=navy>exists<i>(path)</i></font></dt>
+<dd>exists tests whether the argument <i>path</i> exists in the file system.</dd>
+<p>
+<dt><font color=navy>copy <i>(fromPath,toPath)</i>, cp <i>(fromPath,toPath)</i></font></dt>
+<dd>Copies files or directory trees.</dd>
+<p>
+<dt><font color=navy>copyReplace <i>(fromFile,toFile,matchString,replaceString)</i></font></dt>
+<dd>Copys a text file with string replacement.</dd>
+<p>
+<dt><font color=navy>grep <i>(text,path[,comment])</i></font></dt>
+<dd>Tests if the file <i>path</i> contains the text <i>text</i>.  Files beginning with the optional <i>comment</i> (default "#") character
+are ignored for the purpose of testing the condition.</dd>
+<p>
+<dt><font color=navy>freeDisk <i>(freemegs[,path])</i></font></dt>
+<dd>Test whether the current working directory is in a file system with at least <i>freemegs</i> megabyte of free space.
+This is only tested once at installation time.  The optional <i>path</i> variable let's you test the free space in other parts of the
+installer's file system.</dd>
+<p>
+<dt><font color=navy>cat <i>(path)</i></font></dt>
+<dd>Prints a file during installation as with the familiar unix command.</dd>
+<p>
+<dt><font color=navy>ls <i>(path)</i></font></dt>
+<dd>Prints the contents of a directory as with the familiar unix commmand.</dd>
+<p>
+<dt><font color=navy>softLink <i>(linkFrom,linkTo)</i></font></dt>
+<dd>Create a soft link.</dd>
+<p>
+<dt><font color=navy>insertLine (text,path[,justAfterLineContaining])</i></font></dt>
+<dd>Reversibly insert a line of text <i>text</i> into a text file at <i>path</i>.  The optional third argument lets you insert a the text
+line just after a line containing the specified text <i>justAfterLineContaining</i>.</dd>
+<p>
+<dt><font color=navy>textFile(path,lines)</font></dt>
+<dd>textFile creates a text file containing <i>lines</i>.  The <i>lines</i> argument must be a list of text strings in brackets as in 
+<b>textFile ('foo.csh',['#','# - comment','#'])</b>
+</dd>
+<p>
+<dt><font color=navy>mail <i>(userEmail[,subject[,body])</i></font></dt>
+<dd>Mail sends an email message to <i>userEmail</i> with optional subject <i>subject</i> and optional text body <i>body</i>. 
+If the <i>body</i> argument is used, it must be a list of text strings in brackets as in
+<b>mail ('youssef@bu.edu','hello',['hi','there'])</b>.</dd>
+<p>
+<dt><font color=navy>alias <i>(from,to)</i></font></dt>
+<dd>Standard unix alias.</dd>
+<p>
+<dt><font color=navy>true<i>()</i>, false<i>()</i></font></dt>
+<dd>true() is a condition which is guaranteed to always be satisfied and false() is guaranteed never to be satisfied.</dd>
+</dl>
+
+<hr size=5>
+<p>
+<h2><font color=navy>Packages etc.</font></h2>
+<p>
+<dl>
+<dt><font color=navy>package <i>(PACKAGE)</i>, configure <i>(PACKAGE)</i></font></dt>
+<dd>package <i>(PACKAGE)</i> causes a Pacman package to be installed starting at the current working directory.  The argument 
+<i>PACKAGE</i> can be any Pacman <a href="The_full_package_specification_syntax.html">package specification</a> such as
+<pre><b><font color="#8B0000">package('BU:Python | versionGE(2.2)')
+</font></pre></b>
+The configure atom has the same syntax and differs from package only in inducing the correct behavior when Pacman uninstalls and
+updates packages.  The rule that you should follow is this:
+<p>
+<ul>
+<li> <i><b>Always use configure if you are modifying the contents of another package.</b></i>
+<li> <i><b>Use configure('FOO..') if you want your package to be re-installed whenever FOO is reinstalled.</b></i>
+</ul>
+<p>
+The practical effect of using configure is that packages become linked together in terms of what must be uninstalled and
+re-installed together.
+<p>
+<dt><font color=navy>packageName <i>(packageName)</i></font></dt>
+<dd>packageName sets the name of a Pacman package to <i>packageName</i>.  For example, if you have a package <b>FOO.pacman</b> with
+no <b>packageName</b> in the source code, the package name is taken to be "FOO".  If, on the other hand, you have several versions
+of FOO in <b>FOO-1.0.pacman, FOO-1.1.pacman, FOO-1.2.pacman</b>, you should use <b>packageName('FOO')</b> in each of these files so
+that all three packages have the name "FOO".</dd>
+<p>
+</dd>
+<dt><font color=navy>description <i>(text)</i></font></dt>
+<dd>description lets you attach a description string to a package.  This string is used for browsing and web displays.</dd>
+<p>
+<dt><font color=navy>url <i>(URL)</i>, author <i>(authorString)</i>, contact <i>(contactString)</i></font></dt>
+<dd>url, author and contact let you provide useful information about a package which is then used in browsing and web displays.</dd>
+<p>
+<dt><font color=navy>register <i>(symbolicCacheName,cacheURL,infoString,infoURL,contactString,contactEmail)</i></font></dt>
+<dd>register let's you define your own symbolic cache names.  This is typically useful for large project who want to define a common
+set of caches with convenient names.  For example,
+<pre><b><font color="#8B0000">register('BU','http://atlas.bu.edu/caches','Atlas Tier 2, Boston University','http://physics.bu.edu/~usatlas/','Saul Youssef', 'http://physics.bu.edu/~youssef/')
+</font></pre></b>
+defines the symbolic cache name <b>BU</b>, so that one can refer to <b>BU:Python</b>, for example.
+</dd>
+</dl>
+<hr size=5>
+<p>
+<h2><font color=navy>Grid related atoms</font></h2>
+<p>
+<dl>
+<dt><font color=navy>hasGlobusAccess <i>(DN,localusername)</i></font></dt>
+<dd>hasGlobusAccess tests whether distinguished name <i>DN</i> is mapped to local username <i>localusername</i> in the standard
+globus grid-map file.</dd>
+<p>
+<dt><font color=navy>globusAccess <i>(DN,localusername[,position])</i></font></dt>
+<dd>globusAccess is the same as hasGlobusAccess except that it adds the DN to the grid-mapfile if it's not already there.  The 
+<i>position</i> argument can be <i>first</i> or <i>last</i> to specify if the <i>DN</i> is added to the beginning or end of the
+grid-mapfile.</dd>
+<p>
+<dt><font color=navy>hasSshAccess <i>(username,public_key)</i></font></dt>
+<dd>hasSshAccess tests whether <i>username</i> has access to the installation computer using the public key <i>public_key</i>.</dd>
+<p>
+<dt><font color=navy>sshAccess <i>(username,public_key)</i></font></dt>
+<dd>sshAccess is the same as hasSshAccess except that if the condition is not satisfied, Pacman will add the public_key to the
+authorized keys file of the user <i>username</i>.</dd>
+<p>
+<dt><font color=navy>username <i>(username)</i>, userExists <i>(username[,group])</i>, groupExists <i>(group)</i>, 
+userAdd <i>(username[,group[,shell[,homedir]]]])</i>, groupAdd <i>(group)</i></font></dt>
+<dd>username requires that the installer be a specific username.  userExists requires that a user <b>username</b> exists on the
+installing system.  The <i>group</i> can also optionally be specified.  userAdd adds a user to the system if necessary with 
+username, group, shell and home directory as indicated.  For examples
+<pre><b><font color="#8B0000">username('root')                                        # requires that only root may install the package
+userExists('youssef')                                   # requires that a username youssef exists
+userAdd('youssef','physics','/bin/csh','/home/youssef') # creates a user youssef if necessary
+</font></pre></b>
+If the installer doesn't have priviledge to perform these operations, Pacman will provide sensible error messages.
+</dd>
+<p>
+<dt><font color=navy>workspace <i>(name,env,minmegs[,owner[,options]])</i></font></dt>
+<dd>workspace sets up a working directory with at least <i>minmegs</i> of free space by asking the installer to choose a location.
+The working space is given a name <i>name</i> and Pacman sets an environment variable <i>env</i> whose value is the path of the
+chosen working space directory.  The optional <i>owner</i> argument sets the ownership of the work space.  
+The optional <i>options</i> argument sets properties of the work space. <i>options</i> is a character string which may contain
+any of the strings:
+<i>ownerRead</i>,<i>ownerWrite</i>,<i>ownerExecute</i>,<i>groupRead</i>,<i>groupWrite</i>,<i>groupExecute</i>,<i>worldRead</i>,
+<i>worldWrite</i>,<i>worldExecute</i> to
+indicate the file protection status of the working space.  
+The options string may
+also contain <i>temporary</i> or <i>permanent</i> to indicate if the workspace is to remain after the Pacman package is uninstalled.
+By default, a workspace is <i>ownerWrite</i> and <i>temporary</i>.
+Typical examples are
+<pre><b><font color="#8B0000">workspace('Job Output','JOBOUTPUT',10000)              # makes a 100 G working space
+workspace('Temporary Working Space','WORK_TMP',10000)  # makes a 10 G temporary work space
+</font></pre></b>
+As usual, Pacman takes care of removing such workspaces and their contents unlesss you use the <i>permanent</i> option.
+</dd>
+</dl>
+<p>
+</dl>
+<hr size=5>
+<p>
+<h2><font color=navy>System properties</font></h2>
+<p>
+<dl>
+<dt><font color=navy>platform <i>(plat)</i>, platformLE <i>(plat)</i>, platformLT <i>(plat)</i>, platformGE <i>(plat)</i>, 
+platformGT <i>(plat)</i></font></dt>
+<dd>platform lets you make requirements on the basic system architecture. Typical examples are 
+<b><pre><font color="#8B0000">platform('linux-redhat-7.3')  # require RedHat Linux version 7.3
+#
+#- Require RedHat version 7.3-9 or any version of cygwin
+#
+{ platformGE('linux-redhat-7.3'); platformLT('linux-redhat-9') OR platformGE('cygwin') } 
+</font></pre></b>
+You can get a list of supported platforms by doing <b>% pacman -platforms</b>.
+</dd>
+<p>
+<dt><font color=navy>tcpPorts <i>(host,portStart,portEnd)</i></font></dt>
+<dd>tcpPorts lets you require internet connectivity to <i>host</i> with port range as indicated.  The test for connectivity is done
+once at installation time.</dd>
+<p>
+<dt> <font color=navy>rpm <i>(filename)</i>, rpmInstalled <i>(filename)</i></font></dt>
+<dd>rpm and rpmInstalled let you install an rpm as part of an installation procedure (rpm) or test if an rpm is already installed
+(rpmInstalled).  As with all Pacman operations, if Pacman installs an rpm for you when a package is installed, it will also remove
+it when the package is uninstalled.</dd>
+<p>
+<dt><font color=navy>heapSize <i>(bytes)</i>, stackSize <i>(bytes)</i>, imageSize <i>(bytes)</i></font></dt>
+<dd>These atoms test the maximum memory sizes on the installing system.  imageSize <i>(bytes)</i> guarantees that 
+a image with size at least <i>bytes</i> can be run.</dd>
+<p>
+<dt><font color=navy>fileSizeSoft <i>(bytes)</i>, fileSizeHard <i>(bytes)</i>, fileSize <i>(bytes)</i></font></dt>
+<dd>These atoms test maximum allowed file sizes on a system.  fileSize <i>(bytes)</i> guarantees that a file with size
+at least <i>bytes</i> can be created.</dd>
+<p>
+<dt><font color=navy>timeErrorMaximum <i>(seconds)</i></font></dt>
+<dd>timeErrorMaximum requires that the system clock on the installing system to be accurate to within
+<i>seconds</i> seconds.  This is typically important for distributed computing or grid applications.</dd>
+<p>
+<dt><font color=navy>downloadTime <i>(FILE,minimumSeconds)</i></font></dt>
+<dd>downloadTime is a network performance test.  
+It requires that the FILE (syntax is the same as in <i>download</i>) 
+be downloaded to the installation site within <i>minimumSeconds</i> seconds.</dd>
+<p>
+<dt><font color=navy>cpuSecondsSoft <i>(seconds)</i>, cpuSecondsHard <i>(seconds)</i>, cpuSeconds <i>(seconds)</i></font></dt>
+<dd>Systems sometimes have built in limits on the maximum cpu time a process can used before it is automatically killed.
+These atoms let you require that such limits are greater than <i>seconds</i> seconds.  <i>cpuSeconds</i> requires that the
+minimum of the soft and hard limits be greater than the <i>seconds</i> argument.</dd>
+<p>
+<dt><font color=navy>openFileDescriptorsSoft <i>(ndesc)</i>, openFileDescriptorsHard <i>(ndesc)</i>, openFileDescriptors
+<i>(ndesc)</i></font></dt>
+<dd>These atoms test the maximum allowed number of open file descriptors on a system.  openFileDescriptors <i>(ndesc)</i> guarantees
+that at least <i>ndesc</i> file descriptors can be open at once.</dd>
+<p>
+<dt><font color=navy>runningProcess <i>(processName)</i></font></dt>
+<dd>runningProcess requires that <i>processName</i> be a currently running process at the time of installation.</dd>
+<p>
+<dt><font color=navy>fileCopyMinimumMegsPerSecond <i>(path,minimumMegsPerSecond)</i></font></dt>
+<dd>fileCopyMinimumMegsPerSecond lets you test disk writing speed at the installation machine.  This requires that
+at least <i>minimumMegsPerSecon</i> can be copied from one file to another at location <i>path</i>.</dd>
+</dl>
+<p>
+<hr size=5>
+<p>
+<h2><font color=navy>Versions, releases tags, natively installed software</font></h2>
+<p>
+<dl>
+<dt><font color=navy>version <i>(text)</i>, versionLE <i>(text)</i>, versionLT <i>(text)</i>, versionGE <i>(text)</i>,
+versionGT <i>(text)</i></font></dt>
+<dd>Version lets you assign a version string to a package.  Versions, releases and tags have no intrinsic meaning within Pacman; 
+they are just strings with standard lexical ordering.  Typically, one does something like 
+<b><pre><font color="#8B0000">version('1.1')  # this package is version 1.1
+</font></pre></b>
+in package Foo.  Then, in another package, you can do
+<b><pre><font color="#8B0000">package("Foo | { versionGE('1.0'); versionLT('2.0') OR version('3.0-beta') }")
+</font></pre></b>
+to select particular versions, or, similarly, on the command line
+<b><pre><font color="#8B0000">% pacman -get "Foo | { versionGE('1.0'); versionLT('2.0') OR version('3.0-beta') }"
+</font></pre></b>
+In the Pacman browsing functions, if you do <b>-l -d versions</b> or <b>-lc -d version</b> the versions of packages will be
+displayed.
+<p>
+</dd>
+<dt><font color=navy>release <i>(text)</i>, releaseLE <i>(text)</i>, releaseLT <i>(text)</i>, releaseGE <i>(text)</i>, 
+releaseGT <i>(text)</i></font></dt>
+<dd>Similar to version above.</dd>
+<p>
+<dt><font color=navy>tag <i>(text)</i>, tagLE <i>(text)</i>, tagLT <i>(text)</i>, tagGE <i>(text)</i>, 
+tagGT <i>(text)</i></font></dt>
+<dd>Similar to version and release above.</dd>
+<p>
+<dt><font color=navy>linuxKernel <i>(text)</i>, linuxKernelLE <i>(text)</i>, linuxKernelLT <i>(text)</i>, 
+linuxKernelGE <i>(text)</i>, linuxKernelGT <i>(text)</i></font></dt>
+<dd>These atoms let you require versions or version ranges of the standard linux kernel.</dd>
+<p>
+<dt><font color=navy>gccVersion <i>(text)</i>, gccVersionLE <i>(text)</i>, gccVersionLT <i>(text)</i>, 
+gccVersionGE <i>(text)</i>, gccVersionGT <i>(text)</i></font></dt>
+<dd>These atoms let you require versions or version ranges of the standard linux kernel.</dd>
+<p>
+<dt><font color=navy>pythonVersion <i>(text)</i>, pythonVersionLE <i>(text)</i>, pythonVersionLT <i>(text)</i>, 
+pythonVersionGE <i>(text)</i>, pythonVersionGT <i>(text)</i></font></dt>
+<dd>These atoms let you require versions or version ranges of the standard linux kernel.</dd>
+<p>
+<dt><font color=navy>pythonVersion <i>(text)</i>, pythonVersionLE <i>(text)</i>, pythonVersionLT <i>(text)</i>, 
+pythonVersionGE <i>(text)</i>, pythonVersionGT <i>(text)</i></font></dt>
+<dd>These atoms let you require versions or version ranges of the standard linux kernel.</dd>
+<p>
+<dt><font color=navy>sshVersion <i>(text)</i>, sshVersionLE <i>(text)</i>, sshVersionLT <i>(text)</i>, 
+sshVersionGE <i>(text)</i>, sshVersionGT <i>(text)</i></font></dt>
+<dd>These atoms let you require versions or version ranges of the standard linux kernel.</dd>
+<p>
+<dt><font color=navy>perlVersion <i>(text)</i>, perlVersionLE <i>(text)</i>, perlVersionLT <i>(text)</i>, 
+perlVersionGE <i>(text)</i>, perlVersionGT <i>(text)</i></font></dt>
+<dd>These atoms let you require versions or version ranges of the standard linux kernel.</dd>
+<p>
+<dt><font color=navy>perlVersion <i>(text)</i>, perlVersionLE <i>(text)</i>, perlVersionLT <i>(text)</i>, 
+perlVersionGE <i>(text)</i>, perlVersionGT <i>(text)</i></font></dt>
+<dd>These atoms let you require versions or version ranges of the standard linux kernel.</dd>
+<p>
+<dt><font color=navy>pacmanVersion <i>(text)</i>, pacmanVersionLE <i>(text)</i>, pacmanVersionLT <i>(text)</i>, 
+pacmanVersionGE <i>(text)</i>, pacmanVersionGT <i>(text)</i></font></dt>
+<dd>These atoms let you require versions or version ranges of the standard linux kernel.</dd>
+</dl>
+<p>
+If you want to test versions of software not in this list, a good option is to use <b>shellOutput</b>, <b>shellOutputLE</b>, etc.
+<p>
+<hr size=5>
+<p>
+<h2><font color=navy>Executing shell commands</font></h2>
+<p>
+<dl>
+<dt><font color=navy>shell <i>(command)</i>, shellDialogue <i>(command)</i></font></dt>
+<dd>shell and shellDialogue let you execute standard shell commands as part of a Pacman installation.  In general, you should
+use Pacman syntax instead of shell commands whenever possible for several reasons:
+<ul>
+<li> Pacman commands maintain their correctness over time and automatically "undo" themselves when packages are uninstalled.
+<li> shell commands are executed as subprocesses, so you can't affect the installation environment variables by executing a script or shell
+command.
+<li> From the point of view of a cautious installer, shell commands are a potential danger.
+</ul>
+Several command line switches in <b>-v help</b> and <b>-ask help</b> relate to shell commands.  An installer can, for instance, use 
+<b>-ask shell</b> and Pacman will stop and ask permission before executing any of these shell commands.  From the Pacman
+perspective, if a shell command returns no exit code, it is considered to have successfully executed.  The shell atom sends sysout
+to a log file, so if you are executing a script that interacts with the installer, you should use shellDialogue.
+</dd>
+<p>
+<dt><font color=navy>shellOutputContains <i>(command,text)</i></font></dt>
+<dd>shellOutputContains executes the shell command <i>command</i> and requires that the output contains <i>text</i>.</dd>
+<p>
+<dt><font color=navy>shellOutputEQ <i>(command,text)</i>, shellOutputLE <i>(command,text)</i>, shellOutputGE <i>(command,text)</i></font></dt>
+<dd>shellOutputEQ,LE,GE let's you compare the output of a shell command to a provided string.  This is convenient for 
+requiring versions of natively installed software.  For example, if you want to require GNU Wget at least version 1.9, you can 
+do
+<b><pre><font color="#8B0000">shellOutputGE('wget -v','GNU Wget 1.9')
+</font></pre></b>
+this requires both that wget is available and that the start of the resulting output matches or exceeds the provided string.
+</dd>
+<p>
+<dt><font color=navy>uninstallShell <i>(command)</i></font></dt>
+<dd>uninstallShell let's you specify shell commands which are only executed when a package is uninstalled.  This is typically 
+useful for cleaning up the result of other shell commands.</dd>
+</dl>
+<p>
+<hr size=5>
+<p>
+<h2><font color=navy>File manipulation</font></h2>
+<p>
+<dl>
+<dt><font color=navy>isWorldRead <i>(path)</i>, isWorldWrite <i>(path)</i>, isWorldExecute <i>(path)</i>, isGroupRead <i>(path)</i>, isGroupWrite, isGroupExecute,
+isOwnerRead <i>(path)</i>, isOwnerWrite <i>(path)</i>, isOwnerExecute <i>(path)</i></font></dt>
+<dd>These atoms test whether files or directories are world/group/owner read/writable.</dd>
+<p>
+<dt><font color=navy>setWorldReadable <i>(path)</i>, setWorldWriteable <i>(path)</i>, 
+setWorldExecutable <i>(path)</i>, setGroupWriteable <i>(path)</i>,
+setGroupExecutable <i>(path)</i>, setOwnerReadable <i>(path)</i>, 
+setOwnerWriteable <i>(path)</i>, setOwnerExecutable <i>(path)</i></font></dt>
+<dd>These are the same as the previous atoms except that they will set the indicated file access if it has not been done alreay.  As
+with all Pacman operations, the change in file access will be undone when the Pacman package is uninstalled.</dd>
+<p>
+<dt><font color=navy>ownedBy <i>(path[,username])</i></font></dt>
+<dd>ownedBy tests that the file specified by <i>path</i> is owned by <i>username</i>.  The default for <i>username</i> is 
+the username of the installer.</dd>
+<p>
+<dt><font color=navy>chown <i>(path[,username])</i>, chownR <i>(path[,username])</i></font></dt>
+<dd>chown changes the ownership of a file to <i>username</i>.  <i>username</i> defaults to the username of the installer.
+chownR recursively changes the ownership of a directory tree.</dd>
+</dl>
+<p>
+<hr size=5>
+<h3><a href="http://physics.bu.edu/pacman/" target="_blank">Pacman Headquarters</a></h3>
+<p>
+</body>

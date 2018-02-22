@@ -1,0 +1,104 @@
+<title>Overview</title>
+<body background="sky.gif">
+<p>
+<h1><font color=navy>Overview</font></h1>
+<p>
+<hr size=5>
+<p>
+    Pacman environments are defined by a simple language with syntax as follows.
+
+The language is made from <i>atoms.</i>  An atom may either be
+<ul>
+<li> One of the function calls chosen from the available atomic functions.
+<li> Any of the one-line statements from the Pacman 2 language.
+</ul>
+A statement in the language is either an atom, or 
+<ul>
+<li> A sequence of statements separated by semicolons or carriage returns.
+<li> Text of the form <b>{ s1 OR s2 OR s3 OR ... OR sn }</b> where <b>s1, s2,...,sn</b> are
+statements.
+</ul>
+Notice that this implies that you can nest semicolons and OR as in "<b> a; { b OR { c OR d; e } }; f </b>," etc.
+As usual, lines can be continued with the backslash character and, as usual, the <b>#</b> character outside
+of a quoted text causes the rest of the line to be taken as a comment.  Blank lines and
+indentation are ignored.
+<p>
+Here is an example to give you an idea of what it looks like.
+<pre><b><font color="#8B0000">#
+#  Sample of Pacman syntax.  Each such file defines a "package".
+#
+platformGE('linux-redhat-7.1')   # Require Red-Hat linux greater than or equal to 7.1
+platformLE('linux-redhat-7.3')   # ...and less than or equal to 7.3.
+gccVersionGT('2.8')              # tests for "native" gcc version greater than 2.8
+which('configure'); which('make'); which('gcc')
+
+download('http://xxxx/something.tar.gz')
+untarzip('something.tar.gz')
+
+cd('$PAC_TARBALLROOT')   # cd into the unzipped tarball
+shell('./configure')     # configure some software
+shell('./make')          # make some software
+cd()                     # cd back
+
+package('Pacman:nedit | versionGE("1.0")') # Requires another package at this point.
+#
+#  Set up a workspace
+#
+workspace("Bob's Sandbox",'BOB_LOCATION',1000,'bob','groupwrite')
+
+{ yes('OK to send email?'); mail('youssef@bu.edu','hi') OR message('No email sent.') }
+
+setenv     ('BOB_HOME','~bob')     # set an environment variable that will be part of a users's setup
+setenvTemp ('BOB_TEMP','~bob/tmp') # set a temporary environment variable
+
+message('Success!')</font></pre></b>
+Such scripts must be put into text files with <b>pacman</b> extensions as in
+<b>Sample.pacman</b>.  Each such file defines a "package."  
+<p>
+    You can think of a program like <b>Sample.pacman</b> as defining a sequence of conditions which Pacman may
+(or may not) be able to establish.  If all of these conditions are established, in order, 
+then "Sample" is "installed."  Pacman automatically keeps track of these
+conditions over time and automatically has the ability to correctly "undo everything that was done."
+<p>
+    Before listing all of the (more than 160) atoms, there are a few general points to keep in mind:
+<p>
+<ul>
+<li> You can include packages within packages recursively as indicated above. This is the main mechanism for
+building complex environments.  
+<li> Some atoms allow you to interact with the installer.  The <b><font color="#8B0000">yes</font></b> atom above, for
+example, asks a yes or no question and is satisfied if the answer is "yes".  Pacman remembers the answers to these
+questions, so that when a package is re-installed at a later date, the installer does not have to repeat the answers.
+<li> In the <b><font color="#8B0000">OR</font></b> statement form, the branches are evaluated in order.  For example, the
+statement
+<pre>
+<b><font color="#8B0000">{ yes('OK to send email?'); mail('youssef@bu.edu','hi') OR message('No email sent.') }</font></b>
+</pre>
+has the effect of first asking the question.  If the installer answers <i>yes</i>, the email is sent.  
+If the installer answers <i>no</i>, then the alternative branch is attempted, the message is 'No email send.' is
+displayed, and the installation continues.
+<li> It is always best to avoid the various shell atoms whenever possible.  For instance, if you want to set an
+environment variable <b>FOO</b> to <b>BAR</b>, it is much better to do
+<pre>
+<b><font color="#8B0000">setenv('FOO','BAR')</font></b>
+</pre>
+rather than
+<pre>
+<b><font color="#8B0000">shell('setenv FOO BAR')</font></b>
+</pre>
+In the second case (since shell commands are executed as sub-processes), the shell command will have no effect and would
+also fail unless the installer was installing from the c-shell.  Another non-obvious reason has to do with gaining the
+trust of someone who might install your software.  If a complex installation has many shell commands, then it may be
+difficult for an installer to decide to go ahead with the procedure and trust that the shell commands will not do anything
+harmful.  On the other hand, if there are only a few shell commands and everything else are non-shell Pacman atoms (which
+are always safe to execute), then an installer can proceed with confidence or at least has fewer shell commands to look
+over.
+</ul>
+You can find more extensive examples of real applications in the tutorials section.  Subsections
+describe the atoms of the language and give small examples.
+
+<p>
+<hr size=5>
+<h3><a href="http://physics.bu.edu/pacman/" target="_blank">Pacman Headquarters</a></h3>
+<p>
+</body>
+

@@ -1,0 +1,56 @@
+#!/bin/sh
+###########################
+# Get the status of a job
+# A. De Salvo - 2013
+# LJSFi framework v2.0.0
+
+source $BINPATH/$LJSF_CMDSET/multi-status.def
+
+# Get the command line options
+PROXYCHECK="yes"
+OPTS=`getopt -o dhn -l debug,help,nocheck -- "$@"`
+if [ $? != 0 ] ; then echo "Terminating..."; exit -1 ; fi
+eval set -- "$OPTS"
+while true ; do
+        case "$1" in
+                -h|--help)         help; shift;;
+                -d|--debug)         DEBUG="yes"; shift;;
+                -n|--nocheck)       PROXYCHECK="no"; shift;;
+                --)                 shift ; break ;;
+                \?)                 break ;
+                exit ;;
+        esac
+done
+
+# Check the DB status
+$BINPATH/dbcheck
+rc=$?
+[ $rc -ne 0 ] && exit $rc
+
+#Check the proxy status
+if [ "$PROXYCHECK" == "yes" ] ; then
+  $BINPATH/check-proxy
+  rc=$?
+  [ $rc -ne 0 ] && exit $rc
+fi
+
+PANDAIDS="`cat $@ | grep "^PandaID" | sed 's/^PandaID=\(.*\)/\1/' | tr '\n' ',' | sed 's/,$//'`"
+NUMIDS="`echo $PANDAIDS | tr ',' '\n' | wc -l`"
+echo "Number of jobs to process: $NUMIDS"
+INDX=0
+getStatus $PANDAIDS | while read INFO; do
+    INDX=$((INDX+1))
+    JOBID="`echo $INFO | cut -d '|' -f 1`"
+    STATUS="`echo $INFO | cut -d '|' -f 2`"
+    DEST="`echo $INFO | cut -d '|' -f 3`"
+    REACH="`echo $INFO | cut -d '|' -f 4`"
+    EXITCODE="`echo $INFO | cut -d '|' -f 5`"
+    JOBNAME="`ljsf get job name jobid=$JOBID | sed 's/.job$//'`"
+    printf "========== %-50s [%d] ==========\n" "$JOBNAME" "$INDX"
+    printf "%-50s: %s\n" "$JOBNAME status" "$STATUS"
+    printf "%-50s: %s\n" "$JOBNAME destination" "$DEST"
+    printf "%-50s: %s\n" "$JOBNAME reached at" "$REACH"
+    [ "$EXITCODE" != "" ] && printf "%-50s: %s\n" "$JOBNAME exit code" "$EXITCODE"
+done
+
+exit

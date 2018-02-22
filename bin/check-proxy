@@ -1,0 +1,19 @@
+#!/usr/bin/env python
+
+import os
+from ljsfutils import *
+
+minproxy=14400
+maxproxy=86400
+gridproxyhours=200
+if (os.environ.has_key('LJSF_MINPROXY_LT')):
+  minproxy=int(os.environ['LJSF_MINPROXY_LT'])
+if (os.environ.has_key('LJSF_MAXPROXY_LT')):
+  maxproxy=int(os.environ['LJSF_MAXPROXY_LT'])
+if (os.environ.has_key('LJSF_MAXMYPROXY_LT')):
+  myproxyhours=int(os.environ['LJSF_MAXMYPROXY_LT'])
+if (os.environ.has_key('LJSF_MAXGRIDPROXY_LT')):
+  gridproxyhours=int(os.environ['LJSF_MAXGRIDPROXY_LT'])
+
+utils=ljsfUtils()
+utils.checkProxy(minproxy,maxproxy,myproxyhours,gridproxyhours)

@@ -1,0 +1,52 @@
+#!/bin/sh
+###########################
+# Cancel a job
+# A. De Salvo - 2013
+# LJSF framework v2.0
+
+help()
+{
+  echo "Usage: `basename $0` [OPTIONS] <job name|job ID>"
+  echo "       OPTIONS:"
+  echo "            -y|--assume-yes   Assume yes to all the questions."
+  echo "            -i|--job-id       Cancel by job ID."
+  exit 0
+}
+
+source $BINPATH/$LJSF_CMDSET/cancel.def
+
+#Check the DB status
+$BINPATH/dbcheck
+rc=$?
+[ $rc -ne 0 ] && exit $rc
+
+#Check the proxy status
+$BINPATH/check-proxy
+
+# Defaults
+ASSUMEYES="no"
+
+OPTS=`getopt -o hi:y -l assume-yes,job-id:,help -- "$@"`
+if [ $? != 0 ] ; then echo "Terminating..."; exit -1 ; fi
+eval set -- "$OPTS"
+while true ; do
+        case "$1" in
+                -h|--help)         help; shift;;
+                -y|--assume-yes)   ASSUMEYES="yes";shift;;
+                -i|--job-id)       JOBID="$2";shift 2;;
+                --)                shift ; break ;;
+                \?)                break ;
+                exit ;;
+        esac
+done
+
+if [ -n "$JOBID" ] ; then
+  cancelJobByID $JOBID
+else
+  while [ "$1" != "" ] ; do
+    JOB=$1; shift
+    cancelJob $JOB
+  done
+fi
+
+exit

@@ -1,0 +1,7 @@
+[
+NSAddresses  =  {@NS@};
+MyProxyServer  =  @MYPROXY@;
+VirtualOrganisation  =  "atlas";
+LBAddresses  =  {@LB@};
+HLRLocation  =  "";
+]

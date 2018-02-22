@@ -1,0 +1,19 @@
+#!/bin/sh
+
+TMPWATCH="/usr/sbin/tmpwatch"
+MAXTIME=100
+TMPLIST="tmp.sites.list.$$"
+
+# Delete all the files untouched since the last $MAXTIME hours
+$TMPWATCH $MAXTIME $SITESOUTPUTPATH
+
+# Delete duplicate records
+ls $SITESOUTPUTPATH | \
+   awk -F '.' '{ printf "%s", $1; for (i=2;i<NF;i++) printf ".%s", $i; printf "\n";}' | \
+   grep check-site | sort | uniq > $TMPLIST
+cat $TMPLIST | while read jobname; do
+   MOSTRECENT="`\ls -d ${SITESOUTPUTPATH}/${jobname}* -t | head -n 1`"
+   rm -fr `\ls -d ${SITESOUTPUTPATH}/${jobname}* -t | grep -v ${MOSTRECENT}`
+done
+
+rm -fr $TMPLIST

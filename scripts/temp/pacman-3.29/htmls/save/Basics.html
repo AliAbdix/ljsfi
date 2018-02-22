@@ -1,0 +1,155 @@
+<title>Basics</title>
+<body background="sky.gif">
+
+<h1><font color=navy>Basics</font></h1>
+<hr size=5>
+<dl>
+<dt><font color=navy>download <i>(FILE)</i>, downloadUntar <i>(FILE[,env])</i>, downloadUntarzip <i>(FILE[,env])</i>, untarzip
+<i>(FILE[,env])</i></font></dt>
+<dd>These atoms are used to download files to the current working directory.  The <i>FILE</i> argument may be a full URL or a file
+specified with SSH syntax or a file specified relative to a symbolic cache name or a local file.  Here are examples all downloading
+the same file
+<ul>
+<li> download ('http://atlas.bu.edu/caches/tarballs/foo.tar.gz')
+<li> download ('youssef@atlas.bu.edu:/caches/tarballs/foo.tar.gz')
+<li> download ('BU/tarballs/foo.tar.gz')
+<li> download ('/atlasgrid/caches/tarballs/foo.tar.gz')
+</ul>
+The optional <i>env</i> argument causes Pacman to set an environment variable to the full path of the top level untarred directory.
+The download atom simply downloads; downloadUntar and downloadUntarZip are identical and both automatically untar and unzip as
+necessary. Pacman guarantees that untarring does not overwrite existing files unless you override this feature with <b>-allow
+tar-overwrite</b>.
+</dd>
+<p>
+<dt><font color=navy>md5check <i>(path, md5string)</i></font></dt>
+<dd>md5check <i>(path, md5string)</i> checks if the file at <i>path</i> has md5 checksum-hexstring <i>md5string</i>.</dd>
+<p>
+<dt><font color=navy>setenv <i>(env, val)</i>, setenvTemp <i>(env, val)</i>, envIsSet <i>(env)</i>, envHasValue <i>(env, value)</i>,
+envHasValueTemp <i>(env, value)</i></font></dt>
+<dd>These atoms let you set and test environment variables:
+<ul>
+<li> setenv <i>(env, val)</i> assigns environment variable the value <i>val</i>.  Pacman both guarantees that the environment variable
+that you set maintains it's value independent of any other packages and it also guarantees this value in setup scripts that Pacman
+generates.
+<li> envIsSet <i>(env)</i> requires that the environment variable has been set.
+<li> envHasValue <i>(env, value)</i> requires that the environment variable has been set to the value <i>value</i> and guarantees
+that this is true
+</ul>
+setenvTemp and envHasValueTemp differ from their non-temp versions in that they do not guarantee a permanent condition and do not
+get put setup scripts.
+</dd>
+<p>
+<p>
+<dt><font color=navy>setenvShell <i>(env, command)</i></font></dt>
+<dd> setenvShell <i>(env,command)</i> executes the shell command <i>command</i> and, if the command returns without an
+error code, sets environment variable <i>env</i> to the first non-blank line of the shell command output.
+</dd>
+<p>
+<dt><font color=navy>path <i>(val[,env])</i></font></dt>
+<dd>path <i>(value,[,env])</i> let's you add directories to standard unix path searching variables like the standard PATH and
+LD_LIBRARY_PATH.  <i>env</i> defaults to PATH.  Pacman checks that the directories specified exists and guarantees that file 
+in directories added this way are consistent.  If, for
+example, you do <i>path('/usr/bin/')</i> and <i>path('/usr/local/bin')</i> and both contain the file <i>python</i>, Pacman will report an error.  This
+guarantees that as an author of a Pacman package files that you add to paths are maintained independent of other packages.</dd>
+<p>
+<dt><font color=navy>mkdir <i>(path)</i>, mkdirPersistent <i>(path)</i></font></dt>
+<dd>mkdir (<i>path</i>) makes a new directory and checks it's existence over time.  When a package containing mkdir is uninstalled, the
+directory and it's contents are removed by Pacman.  mkdirPersistent remains after a package is uninstalled.</dd>
+<p>
+<dt><font color=navy>message <i>(text)</i>, echo <i>(text)</i></font></dt>
+<dd>Either of these prints a message.</dd>
+<p>
+<dt><font color=navy>cd <i>(path)</i>, cu <i>(username)</i></font></dt>
+<dd>cd <i>(path)</i> has the same effect as <b>% cd path</b> as a unix shell command.  cd <i>()</i> undoes the previous cd command.
+Similarly, cu <i>(username)</i> changes the username of the installing process and cu <i>()</i> undoes the previous username change.  cu
+only works if the installer is the superuser.</dd>
+<p>
+<dt><font color=navy>yes <i>(question)</i>, no <i>(question)</i>, setenv <i>(env)</i>, choice <i>(option, question, opt1, opt2...)</i>,
+fail (<i>message</i>)</font></dt>
+<dd>Atoms <i>yes</i>, <i>no</i>, setenv with one argument and <i>choice</i> let you as questions at installation time and remember the answers for future
+installations.  This is typically used with OR branching to have a package.  For example,
+<pre><b><font color="#8B0000"> { yes('Do you want to print "FOO"?'); message('FOO') OR message('not printing FOO') }
+</font></pre></b>
+shows how to use <i>yes</i> to ask a question and follow the first branch if the answer is 'yes'.  Similarly, <i>no</i> is satisfied as a
+logical condition if the answer to the question is 'no'.  You can use choice when there are multiple possibilities as in
+<b><pre><font color="#8B0000"> { choice(  'Red','Choose a color','Red','Green','Blue'); message('Red chosen'  ) OR
+   choice('Green','Choose a color','Red','Green','Blue'); message('Green chosen') OR 
+   choice( 'Blue','Choose a color','Red','Green','Blue'); message('Blue chosen' ) }
+</font></pre></b>
+Use fail(<i>message</i>) to cause an installation to fail with an error message as in
+<b><pre><font color="#8B0000"> { yes('OK to make a new directory?'); mkdir('foo') OR fail('No permission to make foo.') }
+</font></pre></b>
+If you want to set an environment variable FOO to a value chosen by the installer, simply do
+<b><pre><font color="#8B0000"> setenv('FOO')
+</font></pre></b>
+and Pacman will ask a question and set <b>FOO</b> appropriately.  All of these atoms save and remember the answers provided, so that the answers don't have to be repeated when the
+software is updated or removed and re-installed.  The installer can always choose to ignore this saved information
+by using <b>-ignore-cookies</b>.
+</dd>
+<p>
+<dt><font color=navy>exists <i>(path)</i></font></dt>
+<dd>This tests that the file <i>path</i> exists at installation time.</dd>
+<p>
+<dt><font color=navy>askUntilFileExists <i>(path)</i></font></dt>
+<dd>This tests that the file <i>path</i> exists at installation time.  If it does not exists, the installer is asked to put
+the file in place and continue.</dd>
+<p>
+<dt><font color=navy>watch <i>(path)</i></font></dt>
+<dd>Tests for the existence of a file or directory tree.  Pacman will record the last modified time of the file or director tree contents.  
+If an installer then does
+<b><pre><font color="#8B0000">% pacman -verify
+</font></pre></b>
+Pacman will report an error if any of the files have been modified.
+</dd>
+<p>
+<dt><font color=navy>which <i>(filename)</i></font></dt>
+<dd>which tests that <i>filename</i> is in the user's standard PATH as in the familiar unix command.</dd>
+<p>
+<dt><font color=navy>copy <i>(fromPath,toPath)</i>, cp <i>(fromPath,toPath)</i></font></dt>
+<dd>Copies files or directory trees.</dd>
+<p>
+<dt><font color=navy>copyReplace <i>(fromFile,toFile,matchString,replaceString)</i></font></dt>
+<dd>Copys a text file with string replacement.</dd>
+<p>
+<dt><font color=navy>grep <i>(text,path[,comment])</i></font></dt>
+<dd>Tests if the file <i>path</i> contains the text <i>text</i>.  Files beginning with the optional <i>comment</i> (default "#") character
+are ignored for the purpose of testing the condition.</dd>
+<p>
+<dt><font color=navy>freeDisk <i>(freemegs[,path])</i></font></dt>
+<dd>Test whether the current working directory is in a file system with at least <i>freemegs</i> megabyte of free space.
+This is only tested once at installation time.  The optional <i>path</i> variable let's you test the free space in other parts of the
+installer's file system.</dd>
+<p>
+<dt><font color=navy>cat <i>(path)</i></font></dt>
+<dd>Prints a file during installation as with the familiar unix command.</dd>
+<p>
+<dt><font color=navy>ls <i>(path)</i></font></dt>
+<dd>Prints the contents of a directory as with the familiar unix commmand.</dd>
+<p>
+<dt><font color=navy>softLink <i>(linkFrom,linkTo)</i></font></dt>
+<dd>Create a soft link.</dd>
+<p>
+<dt><font color=navy>insertLine <i>(text,path[,justAfterLineContaining])</i></font></dt>
+<dd>Reversibly insert a line of text <i>text</i> into a text file at <i>path</i>.  The optional third argument lets you insert a the text
+line just after a line containing the specified text <i>justAfterLineContaining</i>.</dd>
+<p>
+<dt><font color=navy>textFile <i>(path,lines)</i></font></dt>
+<dd>textFile creates a text file containing <i>lines</i>.  The <i>lines</i> argument must be a list of text strings in brackets as in 
+<b>textFile ('foo.csh',['#','# - comment','#'])</b>
+</dd>
+<p>
+<dt><font color=navy>mail <i>(userEmail[,subject[,body])</i></font></dt>
+<dd>Mail sends an email message to <i>userEmail</i> with optional subject <i>subject</i> and optional text body <i>body</i>. 
+If the <i>body</i> argument is used, it must be a list of text strings in brackets as in
+<b>mail ('youssef@bu.edu','hello',['hi','there'])</b>.</dd>
+<p>
+<dt><font color=navy>true <i>()</i>, false <i>()</i></font></dt>
+<dd>true() is a condition which is guaranteed to always be satisfied and false() is guaranteed never to be satisfied.</dd>
+<p>
+<dt><font color=navy>launchWebBrowser <i>(url)</i></font></dt>
+<dd>Launches a web browser to the indicated page.</dd>
+</dl>
+<hr size=5>
+<h3><a href="http://physics.bu.edu/pacman/" target="_blank">Pacman Headquarters</a></h3>
+<p>
+</body>

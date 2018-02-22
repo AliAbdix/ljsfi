@@ -1,0 +1,32 @@
+<title>How to be a good cache manager</title>
+<body background="sky.gif">
+<p>
+<h1><font color=navy>How to be a good cache manager</font></h1>
+<p>
+<hr size=5>
+<p>
+Here are some suggestions for new Pacman developers:
+<ul>
+<li>  Make each package resolve all of it's dependencies, both in terms of other Pacman packages and
+environmental and system requirements.  If you need a certain linux kernel, you should express this
+in Pacman syntax.  It is possible to write packages which only accidentally install
+depending on favorable circumstances.  If, on the other hand, you make each package so that it can be
+correctly installed on it's own, then users of your cache are in a nice flexible position.
+<li> Avoid shell commands whenever practical.
+<li> Check that your packages uninstall without leaving debris behind.  Pacman should always "undo"
+everything it does, but if you have executed shell commands, this property may be violated.
+<li> Make useful comments at the top of each package.
+<li> Use <b>packageName</b> and the versions/releases/tags mechanisms to make new versions of your Packages.  If, instead, you
+just make new files each time without using <b>packageName</b>, Pacman treats these as separate
+packages and your users will not be able to update from one version to another automatically.
+<li> If you have advertised a cache to the outside world, keep in mind that whenever you modify it,
+update notices will appear at all installations containing your packages if the remote installers do
+<b>-update-check</b>.
+</ul>
+If something in your use of Pacman seems peculiar or awkward, I would be
+interested in hearing about it <a href="mailto:youssef@bu.edu">youssef@bu.edu</a>.
+<p>
+<hr size=5>
+<h3><a href="http://physics.bu.edu/pacman/" target="_blank">Pacman Headquarters</a></h3>
+<p>
+</body>

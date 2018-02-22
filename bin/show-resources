@@ -1,0 +1,36 @@
+#!/usr/bin/perl
+
+$INFOCMD   = "$ENV{LCG_LOCATION}/bin/lcg-info --vo atlas --list-ce";
+$INFOATTRS = "--attrs TotalCPUs,MaxCPUTime";
+
+open (INFO, "$INFOCMD $INFOATTRS|") || die ("Cannot get CE informations");
+@list = ();
+@info = ();
+%res  = {};
+while (<INFO>) {
+    @list = split;
+    if (/CE:/) { $CE=$list[2]; }
+    if (/TotalCPUs/) { $CPU=$list[2]; }
+    if (/MaxCPUTime/) { $MAXCPUTIME=$list[2]; }
+    if ($#list<1 and $MAXCPUTIME > 2000) {
+        ($CEHOST) = split(/:/,$CE);
+        if (not defined $res{$CEHOST}) {
+            $res{$CEHOST} = "$CPU,$CE";
+        }
+    }
+}
+close (INFO);
+
+%resources={};
+foreach $key (sort { $res{$b} <=> $res{$a} } keys %res) {
+    ($CPU,$CE) = split(',',$res{$key});
+    if ($CPU > 0) { $resources{$res{$key}} = sprintf("%09d %s",$CPU,$CE); }
+}
+
+open (OUT,"|sort -r | awk '{print \$2}'") || die ("Cannot pipe to sort");
+foreach $key (keys %resources) {
+    if (length($resources{$key}) > 0) { print OUT "$resources{$key}\n"; }
+}
+close(OUT);
+
+exit;

@@ -1,0 +1,5 @@
+Executable = "/bin/hostname";
+OutputSandbox = {"stdout","stderr"};
+stdoutput = "stdout";
+stderror = "stderr";
+#VirtualOrganisation = "atlas";

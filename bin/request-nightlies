@@ -1,0 +1,98 @@
+#!/bin/sh
+##########################################################
+#             ATLAS Nightly kit LJSFi module             #
+# Alessandro De Salvo <Alessandro.DeSalvo@roma1.infn.it> #
+##########################################################
+
+# Check for the cache directory definition
+if [ "$LJSFCACHEPATH" == "" ] ; then
+  echo "No cache dir defined. Exiting."
+  exit -1
+fi
+
+# Check and create the cache directory
+[ ! -d $LJSFCACHEPATH ] && mkdir -p $LJSFCACHEPATH
+if [ ! -d $LJSFCACHEPATH ] ; then
+  echo "Cannot create $LJSFCACHEPATH. Exiting."
+  exit -1
+fi
+
+# URLs for the nightlies
+NIGHTLIES_URL="http://atlas-computing.web.cern.ch/atlas-computing/links/buildDirectory/kitrel/nightlies"
+
+# Get the nightlies setup from $CONFPATH/nightlies.conf
+cat $CONFPATH/nightlies.conf | grep -v "^#" | while read NIGHTLIES_DEF; do
+    NIGHTLIES_NAME="`echo $NIGHTLIES_DEF | cut -d',' -f 1`"
+    NIGHTLIES_CATEGORY="`echo $NIGHTLIES_DEF | cut -d',' -f 2`"
+    NIGHTLIES_PROJECT="`echo $NIGHTLIES_DEF | cut -d',' -f 3`"
+    NIGHTLIES_PRJNAME="`echo $NIGHTLIES_PROJECT | sed 's/^Atlas//g' | tr A-Z a-z`"
+    NIGHTLIES_REQNAME="`echo $NIGHTLIES_DEF | cut -d',' -f 4`"
+    NIGHTLIES_REQPROJECT="`echo $NIGHTLIES_DEF | cut -d',' -f 5`"
+    NIGHTLIES_ARCH="`echo $NIGHTLIES_DEF | cut -d',' -f 6`"
+    NIGHTLIES_OPT="`echo $NIGHTLIES_DEF | cut -d',' -f 7`"
+    STAMP_FILE="stamp_kit_download_${NIGHTLIES_ARCH}-${NIGHTLIES_OPT}"
+    STAMP_FILE_LAST="${STAMP_FILE}.last"
+    NIGHTLIES_CACHE="${LJSFCACHEPATH}/${NIGHTLIES_NAME}"
+    NIGHTLIES_PACMAN_VERSION="`echo $NIGHTLIES_DEF | cut -d',' -f 8`"
+    if [ "$NIGHTLIES_REQNAME" == "" ] ; then
+        echo "Checking ${NIGHTLIES_PROJECT} ${NIGHTLIES_NAME} ${NIGHTLIES_ARCH}-${NIGHTLIES_OPT}"
+    else
+        echo "Checking ${NIGHTLIES_PROJECT} ${NIGHTLIES_NAME} ${NIGHTLIES_ARCH}-${NIGHTLIES_OPT} (requires ${NIGHTLIES_REQPROJECT} ${NIGHTLIES_REQNAME})"
+    fi
+
+    # Get the needed info for the tasks
+    NIGHTLIES_TYPEID="`ljsfinfo.py --show-reltypedef=nightlies | cut -d',' -f 1`"
+    NIGHTLIES_ARCHNAME="_`echo $NIGHTLIES_ARCH | tr - _ | sed 's/^_//g'`"
+    NIGHTLIES_ARCHID="`ljsfinfo.py --show-relarch=$NIGHTLIES_ARCHNAME | grep $NIGHTLIES_OPT | tail -n 1 | cut -d',' -f 1`"
+    VALTASK="`ljsfinfo.py --show-task=validate-nightlies | cut -d',' -f 1`"
+    INSTTASK="`ljsfinfo.py --show-task=install-nightlies | cut -d',' -f 1`"
+    TESTTASK="`ljsfinfo.py --show-task=test-nightlies | cut -d',' -f 1`"
+    UNINSTTASK="`ljsfinfo.py --show-task=uninstall-nightlies | cut -d',' -f 1`"
+    CLEANTASK="`ljsfinfo.py --show-task=cleanup-nightlies | cut -d',' -f 1`"
+    PUBTAGTASK="`ljsfinfo.py --show-task=publish-tag-nightlies | cut -d',' -f 1`"
+    REMTAGTASK="`ljsfinfo.py --show-task=remove-tag-nightlies | cut -d',' -f 1`"
+
+    # Download the files
+    cd $LJSFCACHEPATH
+
+    # Check bugfix release
+    [ ! -d ${NIGHTLIES_CACHE} ] && mkdir -p ${NIGHTLIES_CACHE}
+    cd ${NIGHTLIES_CACHE}
+    [ -f ${STAMP_FILE} ] && mv -f ${STAMP_FILE} ${STAMP_FILE_LAST}
+    wget --quiet ${NIGHTLIES_URL}/${NIGHTLIES_NAME}/${STAMP_FILE}
+    if [ -f ${STAMP_FILE_LAST} ] ; then
+        if [ -f ${STAMP_FILE} ] ; then
+            diff -q ${STAMP_FILE} ${STAMP_FILE_LAST} > /dev/null
+            NIGHTLIES_RC=$?
+        else
+            NIGHTLIES_RC=0
+        fi
+    else
+        NIGHTLIES_RC=1
+    fi
+
+    # Check if the kit has been successfully built
+    if [ -f ${STAMP_FILE} -a $NIGHTLIES_RC -ne 0 ] ; then
+        ISVALID="`cat ${STAMP_FILE} | tail -n 1`"
+        [ "$ISVALID" != "OK" ] && NIGHTLIES_RC=0
+    fi
+
+    # Put a request, if needed
+    if [ $NIGHTLIES_RC -ne 0 ] ; then
+        REL="`cat $LJSFCACHEPATH/${NIGHTLIES_NAME}/${STAMP_FILE} 2>/dev/null | head -n 1`"
+        if [ "$REL" != "" ] ; then
+            # Define the release
+            ljsfinfo.py --define="name=${REL}-${NIGHTLIES_NAME}_${NIGHTLIES_CATEGORY}_${NIGHTLIES_ARCH},build=project,typefk=${NIGHTLIES_TYPEID},archfk=${NIGHTLIES_ARCHID},sw_archfk=${NIGHTLIES_ARCHID},userfk=1,default_validate_taskfk=${VALTASK},default_install_taskfk=${INSTTASK},default_test_taskfk=${TESTTASK},default_uninstall_taskfk=${UNINSTTASK},default_cleanup_taskfk=${CLEANTASK},default_publish_tag_taskfk=${PUBTAGTASK},default_remove_tag_taskfk=${REMTAGTASK},obsolete=0,autoinstall=0,sw_name=${NIGHTLIES_PROJECT},sw_revision=1,pacman_version=${NIGHTLIES_PACMAN_VERSION},pacman_platform=auto,sw_versionarea=${NIGHTLIES_NAME},sw_physicalpath=\$VO_ATLAS_SW_DIR/nightlies/releases/${NIGHTLIES_CATEGORY},sw_logicalpath=\$VO_ATLAS_SW_DIR/nightlies/software/${NIGHTLIES_CATEGORY}/${NIGHTLIES_NAME},sw_atlas_fix_64=no,sw_atlas_compiler=no,kvpost=yes,tag=VO-atlas-${NIGHTLIES_PRJNAME}-${REL}-${NIGHTLIES_NAME}-${NIGHTLIES_CATEGORY}-${NIGHTLIES_ARCH}-${NIGHTLIES_OPT},package=atlas-${NIGHTLIES_PRJNAME}-${REL}-${NIGHTLIES_NAME}-${NIGHTLIES_CATEGORY}-1-${NIGHTLIES_ARCH}-${NIGHTLIES_OPT}.tar.gz,kit_cache=http://atlas-computing.web.cern.ch/atlas-computing/links/buildDirectory/kitrel/nightlies/${NIGHTLIES_NAME}/${REL}/cache"
+            # Send the requests
+            echo "Sending requests for $REL-${NIGHTLIES_NAME}"
+            cat $CONFPATH/nightlies.list $CONFPATH/nightlies-${NIGHTLIES_NAME}-${NIGHTLIES_ARCH}-${NIGHTLIES_OPT}.list 2>/dev/null | grep -v "^#" | sort | uniq | while read CST; do
+                CS="`echo $CST | awk '{print $1}'`"
+                INSTTYPE="`echo $CST | awk '{print $2}'`"
+                echo ljsfreq.py --cs="$CS" --reqtype="$INSTTYPE" --rel="$REL-${NIGHTLIES_NAME}_${NIGHTLIES_CATEGORY}_${NIGHTLIES_ARCH}" --allow-multi --status=autorun
+                ljsfreq.py --cs="$CS" --reqtype="$INSTTYPE" --rel="$REL-${NIGHTLIES_NAME}_${NIGHTLIES_CATEGORY}_${NIGHTLIES_ARCH}" --allow-multi --status=autorun
+            done
+        fi
+    fi
+done
+
+exit

@@ -1,0 +1,14 @@
+#!/bin/sh
+
+CENAME=$1
+
+echo "Updating the following Panda resources:"
+agis-tags -S --ce $CENAME
+ljsfinfo.py --select=release_stat.name --status=installed --cename=$CENAME --quiet | sed 's/"//g' | \
+while read rel; do
+    echo -n "Adding AGIS tags for release $rel ... "
+    agis-tags --rel=$rel --ce=$CENAME --add
+    echo "done"
+done
+
+exit

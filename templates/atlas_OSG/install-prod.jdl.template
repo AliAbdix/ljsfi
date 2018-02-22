@@ -1,0 +1,9 @@
+Executable = "sw-mgr";
+InputSandbox = {"@SCRIPTPATH@/sw-mgr"};
+OutputSandbox = {"stdout", "stderr", "install.xml"};
+stdoutput = "stdout";
+stderror = "stderr";
+Arguments = "-i @RELNAME@ -l @OSGLOGICALPATH@/@RELNAME@ -p @OSGPHYSICALPATH@/@VERSIONAREA@ -o --ddm-setup $OSG_APP/atlas_app/atlas_rel/ddm/latest/setup.sh --use-grid --grid-name @GRIDNAME@ --replicate --snapname @PACKAGE@ --release-ver @SWREVISION@ --host @TAGHOST@ --vo atlas --require-shfs --disk-free @DISKSPACE@ -P @SWNAME@ -T release -t @ARCH@ -O opt -m @PACMANVERSION@ --xml install.xml --site-config $OSG_APP/atlas_app/atlas_rel/AtlasSiteConfig.sh --physical-link $OSG_APP/atlas_app/atlas_rel/@RELNAME@ --post-siteinfo @KITCACHE@ @DBRELEASE@ @ATLASCOMPILER@ @PACBALLDATASET@ @PACBALLNAME@";
+Environment = {"LCG_CATALOG_TYPE=@LCGCATALOGTYPE@","LFC_HOST=@LFCHOST@","LCG_GFAL_INFOSYS=is.grid.iu.edu:2170"};
+VirtualOrganisation = "atlas";
+Requirements = other.GlueCEUniqueId=="@SITE_CS@";

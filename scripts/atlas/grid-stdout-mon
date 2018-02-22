@@ -1,0 +1,692 @@
+#!/usr/bin/perl
+
+# The needed arguments
+print "#########################\n";
+print "beginning the tool\n";
+print "#########################\n";
+
+for ($i = 0; $i<=$#ARGV; $i++){  
+    if ($ARGV[$i] =~ /^-err$/) {
+	for($j = $i + 1; $j <= $#ARGV; $j++) {
+	    last if $ARGV[$j] =~ /^-/;
+	    push (@error,$ARGV[$j]);
+	    $i = $j-1;
+	}
+	$err = "@error";
+    }
+
+    if ($ARGV[$i] =~ /^-out$/) {
+	for($j = $i + 1; $j <= $#ARGV; $j++) {
+	    last if $ARGV[$j] =~ /^-/;
+	    push (@output,$ARGV[$j]);
+	    $i = $j-1;
+	}
+	$out = "@output";
+    }
+
+    if ($ARGV[$i] =~ /^-vo$/) {
+	for($j = $i + 1; $j <= $#ARGV; $j++) {
+	    last if $ARGV[$j] =~ /^-/;
+	    push (@vos,$ARGV[$j]);
+	    $i = $j-1;
+	}
+	$vo = "@vos";
+    }
+}
+
+#####Definition of some variables
+    
+my $bufout;
+my $buferr;
+my $DPMPATH;
+my $offsetStdout;
+my $offsetStderr;
+my $lastWrittenFileStdout;
+my $lastWrittenFileStderr;
+my $the_dn;
+my $job_id;
+my $job_id_completed;
+my $diferencia_out;
+my $size_file_out;
+my $diferencia_out;
+my $size_file_out;
+my $monitoring_flag;
+$currentdir = "$ENV{PWD}";
+
+# Checking the arguments exist, otherwise die:
+
+if (!$err){
+    &Usage;
+    die "The standard error file has not been provided
+         The monitoring of the job has been stopped\n";
+}
+if(!$out){
+    &Usage;
+    die "The standard output file has not been provided
+         The monitoring of the job has been stopped\n";
+}
+elsif(!$vo){
+    &Usage;
+    die "The vo name has not been provided
+         The monitoring of the job has been stopped\n";
+}
+# If all the arguments are given, we continue the transport
+else{
+
+#Setting the SE to store the files
+
+    $DPMHOST = "";
+    if ($ENV{LCG_STDOUT_MON_SE}){
+        $DPMHOST = $ENV{LCG_STDOUT_MON_SE}
+    }
+
+    elsif($ENV{DPM_HOST}){
+        $DPMHOST = $ENV{DPM_HOST}
+    }
+    else{
+	die "There is no available DPM\n";
+    }
+
+    open (LCGINFO, "ldapsearch -x -P2 -h $ENV{LCG_GFAL_INFOSYS} -b 'mds-vo-name=local,o=grid' GlueSARoot | egrep '^dn:|GlueSARoot:' | grep $DPMHOST -A 1 | grep GlueSARoot | grep $vo | cut -d ':' -f 3 |")
+         || die ("Cannot get DPM Root");
+    while (<LCGINFO>) { ($DPMROOT)=split; }
+    close (LCGINFO);
+    $DPMPATH = "//$DPMHOST$DPMROOT";
+
+#Creating the directories inside the DPM
+
+    $env_jobid = "$ENV{EDG_WL_JOBID}";
+
+
+    open FILE1, ">the_ID1";
+    print FILE1 "$env_jobid";
+    close FILE1;
+    
+    system "tail -c 22 the_ID1 > the_ID2";
+    
+    open (FILE, "<the_ID2");
+    while (<FILE>){
+	chomp;
+	$job_id = $_;  
+    }
+    
+    system "grid-proxy-info -identity > DN$$";
+    my $a = $?;
+    if ($a != 0){ die "The proxy is not working\n";}
+    
+    open (FILE, "<DN$$");
+    while (<FILE>){
+	chomp;
+	$the_dn = $_;
+	$the_dn=~ s/\s//g;
+	@dn = split/\//,$the_dn;
+	$the_dn = join("",@dn);
+    }
+        
+    $the_dn2 = $the_dn;
+    $the_dn2 =~ s/=/_/g;
+     
+    $the_dir = $the_dn2 . "/" . "ID" . $job_id;
+    $job_id_completed = "ID" . $job_id;
+
+# Now beginning
+
+    if(-e "$out"){
+	print "Output file exists\n";
+    }
+    if(-e "$err"){
+	print "Error file exists\n";
+    }
+
+# Beginning the fork
+
+    $kidpid = fork();
+    die "Cannot fork" unless defined $kidpid;
+    
+    if ($kidpid) {
+	exit;
+    }else{
+
+	$lastWrittenFileStdout = 0;
+	$lastWrittenFileStderr = 0;
+    
+# How the monitoring option is set?
+
+	if ($ENV{LCG_STDOUT_MON_FLAG}){
+	    $the_monitoring_type = "$ENV{LCG_STDOUT_MON_FLAG}";
+	    if ("$the_monitoring_type" eq "ON_DEMAND"){
+		$monitoring_flag = 1;
+	    }
+	}
+    
+# Beginning to sleep
+
+	sleep(600);
+
+	if ($monitoring_flag){
+
+	    system "globus-url-copy gsiftp:$DPMPATH/$the_dn2/file_on_demand.log file://$currentdir/a.a$$ > /dev/null 2> /dev/null";
+	    my $error_clean = $?;
+
+	    if ($error_clean != 0){ die "The file on demand does not exist";}
+	    open FILE, "<$currentdir/a.a$$";
+	    while (<FILE>){
+		chomp;
+		$the_jobs = $_;
+		if ("$the_jobs" eq "$job_id_completed"){
+                    system "edg-gridftp-mkdir gsiftp:$DPMPATH/$the_dir";
+		    &transport1st_time_out;
+		    &transport1st_time_err;	
+		}
+	    }
+	    close FILE;
+	    system "rm $currentdir/a.a$$";
+	}
+	else{
+            system "edg-gridftp-mkdir gsiftp:$DPMPATH/$the_dir";
+	    &transport1st_time_out;
+	    &transport1st_time_err;
+	}
+
+	
+	sleep(1200);
+
+	if ($monitoring_flag){
+
+	    system "globus-url-copy gsiftp:$DPMPATH/$the_dn2/file_on_demand.log file://$currentdir/a.a$$ > /dev/null 2> /dev/null";
+	    my $error_clean = $?;
+	    
+	    if ($error_clean != 0){ die "The file on demand does not exist";}
+	    open FILE, "<$currentdir/a.a$$";
+	    while (<FILE>){
+		chomp;
+		$the_jobs = $_;
+		
+		if ("$the_jobs" eq "$job_id_completed"){
+
+		    print "He acertado en el sleep 1\n";
+
+		    &transportnth_time_out;
+		    &transportnth_time_err;
+		}
+	    }
+	    close FILE;
+	    system "rm $currentdir/a.a$$";
+	}
+	else{
+	    &transportnth_time_out;
+	    &transportnth_time_err;
+	}
+
+
+	sleep(1800);
+    
+	if ($monitoring_flag){
+
+	    system "globus-url-copy gsiftp:$DPMPATH/$the_dn2/file_on_demand.log file://$currentdir/a.a$$ > /dev/null 2> /dev/null";
+	    my $error_clean = $?;
+	
+	    if ($error_clean != 0){ die "The file on demand does not exist";}
+	    open FILE, "<$currentdir/a.a$$";
+	    while (<FILE>){
+		chomp;
+		$the_jobs = $_;
+		if ("$the_jobs" eq "$job_id_completed"){
+
+		    &transportnth_time_out;
+		    &transportnth_time_err;
+		}
+	    }
+	    close FILE;
+	    system "rm $currentdir/a.a$$";
+	}
+	else{
+	    
+	    &transportnth_time_out;
+	    &transportnth_time_err;   
+	}
+
+	$i = 1;
+    
+#    while($currentdir)
+	while(<>)
+	{
+	
+	    $hour = 3600;
+	    $hour_counter = $hour * $i;
+
+	    sleep($hour_counter);
+	    
+	    if ($monitoring_flag){
+		system "globus-url-copy gsiftp:$DPMPATH/$the_dn2/file_on_demand.log file://$currentdir/a.a$$ > /dev/null 2> /dev/null";
+		my $error_clean = $?;
+		
+		if ($error_clean != 0){ die "The file on demand does not exist";}
+		open FILE, "<$currentdir/a.a$$";
+		while (<FILE>){
+		    chomp;
+		    $the_jobs = $_;
+		    if ("$the_jobs" eq "$job_id_completed"){
+			&transportnth_time_out;
+			&transportnth_time_err;
+		    }
+		}
+		close FILE;
+		system "rm $currentdir/a.a$$";	
+	    }	    
+	else{
+	    &transportnth_time_out;
+	    &transportnth_time_err;    
+	}
+	
+	    ++$i;
+
+	}
+    
+    }
+
+}
+
+sub transport1st_time_out{
+
+    $diferencia_out = 0;
+    $size_file_out = 0;
+
+    foreach($out) 
+    {$size_file_out+=-s;print "$_ ",-s,"\n"}
+
+    if($size_file_out<1000000){
+	
+	system "$ENV{GLOBUS_LOCATION}/bin/globus-url-copy file://$ENV{PWD}/$out gsiftp:$DPMPATH/$the_dir/stdout.$lastWrittenFileStdout";
+
+	open FILE1, ">>Status";
+	print FILE1 "file: stdout sequence: $lastWrittenFileStdout size: $size_file_out\n";
+	close FILE1;
+
+	system "$ENV{GLOBUS_LOCATION}/bin/globus-url-copy file://$ENV{PWD}/Status gsiftp:$DPMPATH/$the_dir/Status";
+
+
+	$offsetStdout = $size_file_out;
+	++$lastWrittenFileStdout;
+	
+    }
+    elsif($size_file_out>1000000){
+	if($size_file_out>1001000){
+	    open(FILE0,"<$out");
+	    $number_read = read(FILE0,$bufout,1000000);
+	    close FILE0;
+
+	    open FILE1, ">stdout.$lastWrittenFileStdout";
+	    print FILE1 "$bufout";
+	    close FILE1;
+	    
+	    system "$ENV{GLOBUS_LOCATION}/bin/globus-url-copy file://$ENV{PWD}/stdout.$lastWrittenFileStdout gsiftp:$DPMPATH/$the_dir/stdout.$lastWrittenFileStdout";
+	    
+	    open FILE2, ">>stdout.$lastWrittenFileStdout1";
+	    print FILE2 "BlockSize:$offsetStdout  TotalSize: $size_file_out\n";
+	    close FILE2;
+
+	    system "tail -c 100000 $out >> stdout.$lastWrittenFileStdout1";
+
+	    system "$ENV{GLOBUS_LOCATION}/bin/globus-url-copy file://$ENV{PWD}/stdout.$lastWrittenFileStdout1 gsiftp:$DPMPATH/$the_dir/stdout.$lastWrittenFileStdout1";
+
+	    open FILE1, ">>Status";
+	    print FILE1 "file: stdout sequence: $lastWrittenFileStdout size: $size_file_out\n";
+	    close FILE1;
+
+	    system "$ENV{GLOBUS_LOCATION}/bin/globus-url-copy file://$ENV{PWD}/Status gsiftp:$DPMPATH/$the_dir/Status";
+
+	    $offsetStdout = $size_file_out;
+	    ++$lastWrittenFileStdout;
+	    
+	}
+	if($size_file_out<1001000){
+	    open(FILE0,"<$out");
+	    $number_read = read(FILE0,$bufout,1000000);
+	    close FILE0;
+
+	    open FILE1, ">stdout.$lastWrittenFileStdout";
+	    print FILE1 "$bufout";
+	    close FILE1;
+	    	    
+	    system "$ENV{GLOBUS_LOCATION}/bin/globus-url-copy file://$ENV{PWD}/stdout.$lastWrittenFileStdout gsiftp:$DPMPATH/$the_dir/stdout.$lastWrittenFileStdout";
+
+	    open FILE2, ">>stdout.$lastWrittenFileStdout1";
+	    print FILE2 "BlockSize: $offsetStdout TotalSize: $size_file_out\n";
+	    close FILE2;
+
+	    $diferencia_out = ($size_file_out - 1000000);
+	    system "tail -c $diference_out $out >> stdout.$lastWrittenFileStdout1";
+
+	    system "$ENV{GLOBUS_LOCATION}/bin/globus-url-copy file://$ENV{PWD}/stdout.$lastWrittenFileStdout1 gsiftp:$DPMPATH/$the_dir/stdout.$lastWrittenFileStdout1";
+
+	    open FILE1, ">>Status";
+	    print FILE1 "file: stdout sequence: $lastWrittenFileStdout size: $size_file_out\n";
+	    close FILE1;
+
+	    system "$ENV{GLOBUS_LOCATION}/bin/globus-url-copy file://$ENV{PWD}/Status gsiftp:$DPMPATH/$the_dir/Status";
+
+	    $offsetStdout = $size_file_out;
+	    ++$lastWrittenFileStdout;
+	}
+    }
+}
+
+
+sub transport1st_time_err{
+
+    $diferencia_err = 0;
+    $size_file_err = 0;
+
+    foreach($err) 
+    {$size_file_err+=-s;print "$_ ",-s,"\n"}
+
+    if($size_file_err<1000000){
+	
+	system "$ENV{GLOBUS_LOCATION}/bin/globus-url-copy file://$ENV{PWD}/$err gsiftp:$DPMPATH/$the_dir/stderr.$lastWrittenFileStderr";
+
+	open FILE1, ">>Status";
+	print FILE1 "file: stderr sequence: $lastWrittenFileStderr size: $size_file_err\n";
+	close FILE1;
+
+	system "$ENV{GLOBUS_LOCATION}/bin/globus-url-copy file://$ENV{PWD}/Status gsiftp:$DPMPATH/$the_dir/Status";
+
+	$offsetStderr = $size_file_err;
+	++$lastWrittenFileStderr;
+	
+    }
+    elsif($size_file_err>1000000){
+	if($size_file_err>1001000){
+	    open(FILE0,"<$err");
+	    $number_read = read(FILE0,$buferr,1000000);
+	    close FILE0;
+
+	    open FILE1, ">stderr.$lastWrittenFileStderr";
+	    print FILE1 "$buferr";
+	    close FILE1;
+	    
+	    system "$ENV{GLOBUS_LOCATION}/bin/globus-url-copy file://$ENV{PWD}/stderr.$lastWrittenFileStderr gsiftp:$DPMPATH/$the_dir/stderr.$lastWrittenFileStderr";
+	    
+	    open FILE2, ">>stderr.$lastWrittenFileStderr1";
+	    print FILE2 "BlockSize:$offsetStderr  TotalSize: $size_file_err\n";
+	    close FILE2;
+
+	    system "tail -c 100000 $err >> stderr.$lastWrittenFileStderr1";
+
+	    system "$ENV{GLOBUS_LOCATION}/bin/globus-url-copy file://$ENV{PWD}/stderr.$lastWrittenFileStderr1 gsiftp:$DPMPATH/$the_dir/stderr.$lastWrittenFileStderr1";
+
+	    open FILE1, ">>Status";
+	    print FILE1 "file: stderr sequence: $lastWrittenFileStderr size: $size_file_err\n";
+	    close FILE1;
+
+	    system "$ENV{GLOBUS_LOCATION}/bin/globus-url-copy file://$ENV{PWD}/Status gsiftp:$DPMPATH/$the_dir/Status";
+
+	    $offsetStderr = $size_file_err;
+	    ++$lastWrittenFileStderr;
+	    
+	}
+	if($size_file_err<1001000){
+	    open(FILE0,"<$err");
+	    $number_read = read(FILE0,$buferr,1000000);
+	    close FILE0;
+
+	    open FILE1, ">stderr.$lastWrittenFileStderr";
+	    print FILE1 "$buferr";
+	    close FILE1;
+	    	    
+	    system "$ENV{GLOBUS_LOCATION}/bin/globus-url-copy file://$ENV{PWD}/stderr.$lastWrittenFileStderr gsiftp:$DPMPATH/$the_dir/stderr.$lastWrittenFileStderr";
+
+	    open FILE2, ">>stderr.$lastWrittenFileStderr1";
+	    print FILE2 "BlockSize: $offsetStderr  TotalSize: $size_file_err\n";
+	    close FILE2;
+
+	    $diferencia_err = ($size_file_err - 1000000);
+	    system "tail -c $diference_err $err >> stderr.$lastWrittenFileStderr1";
+
+	    system "$ENV{GLOBUS_LOCATION}/bin/globus-url-copy file://$ENV{PWD}/stderr.$lastWrittenFileStderr1 gsiftp:$DPMPATH/$the_dir/stderr.$lastWrittenFileStderr1";
+
+	    open FILE1, ">>Status";
+	    print FILE1 "file: stderr sequence: $lastWrittenFileStderr size: $size_file_err\n";
+	    close FILE1;
+
+	    system "$ENV{GLOBUS_LOCATION}/bin/globus-url-copy file://$ENV{PWD}/Status gsiftp:$DPMPATH/$the_dir/Status";
+
+	    $offsetStderr = $size_file_err;
+	    ++$lastWrittenFileStderr;
+	}
+    }
+}
+
+
+
+sub transportnth_time_out{
+
+    $diferencia_out = 0;
+    $size_file_out = 0;
+
+    foreach($out) 
+    {$size_file_out+=-s;print "$_ ",-s,"\n"}
+    
+    if ("$size_file_out" == "$offsetStdout"){
+	
+	open FILE2, ">>stdout.$lastWrittenFileStdout";
+	print FILE2 "BlockSize: $offsetStdout TotalSize: $size_file_out\n";
+	close FILE2;
+	
+	system "$ENV{GLOBUS_LOCATION}/bin/globus-url-copy file://$ENV{PWD}/stdout.$lastWrittenFileStdout gsiftp:$DPMPATH/$the_dir/stdout.$lastWrittenFileStdout";
+
+	open FILE1, ">>Status";
+	print FILE1 "file: stdout sequence: $lastWrittenFileStdout size: $size_file_out\n";
+	close FILE1;
+
+	system "$ENV{GLOBUS_LOCATION}/bin/globus-url-copy file://$ENV{PWD}/Status gsiftp:$DPMPATH/$the_dir/Status";
+
+
+	$offsetStdout = $size_file_out;
+	++$lastWrittenFileStdout;
+	
+    }
+    elsif($size_file_out<1000000){
+
+	$diferencia_out = $size_file_out - $offsetStdout;
+
+	open FILE2, ">>stdout.$lastWrittenFileStdout";
+	print FILE2 "BlockSize: $offsetStdout TotalSize: $size_file_out\n";
+	close FILE2;
+
+	system "tail -c $diferencia_out $out >> stdout.$lastWrittenFileStdout";
+
+	system "$ENV{GLOBUS_LOCATION}/bin/globus-url-copy file://$ENV{PWD}/stdout.$lastWrittenFileStdout gsiftp:$DPMPATH/$the_dir/stdout.$lastWrittenFileStdout";
+
+	open FILE1, ">>Status";
+	print FILE1 "file: stdout sequence: $lastWrittenFileStdout size: $size_file_out\n";
+	close FILE1;
+
+	system "$ENV{GLOBUS_LOCATION}/bin/globus-url-copy file://$ENV{PWD}/Status gsiftp:$DPMPATH/$the_dir/Status";
+
+	$offsetStdout = $size_file_out;
+	++$lastWrittenFileStdout;
+    }
+	
+    elsif($size_file_out>1000000){
+	if($size_file_out>1001000){
+	    open(FILE0,"<$out");
+	    $number_read = read(FILE0,$bufout,1000000);
+	    close FILE0;
+
+	    open FILE1, ">stdout.$lastWrittenFileStdout";
+	    print FILE1 "$bufout";
+	    close FILE1;
+	    
+	    system "$ENV{GLOBUS_LOCATION}/bin/globus-url-copy file://$ENV{PWD}/stdout.$lastWrittenFileStdout gsiftp:$DPMPATH/$the_dir/stdout.$lastWrittenFileStdout";
+	    
+	    open FILE2, ">>stdout.$lastWrittenFileStdout";
+	    print FILE2 "BlockSize: $offsetStdout TotalSize: $size_file_out\n";
+	    close FILE2;
+
+	    system "tail -c 100000 $out >> stdout.$lastWrittenFileStdout";
+
+	    system "$ENV{GLOBUS_LOCATION}/bin/globus-url-copy file://$ENV{PWD}/stdout.$lastWrittenFileStdout gsiftp:$DPMPATH/$the_dir/stdout.$lastWrittenFileStdout";
+
+	    open FILE1, ">>Status";
+	    print FILE1 "file: stdout sequence: $lastWrittenFileStdout size: $size_file_out\n";
+	    close FILE1;
+
+	    system "$ENV{GLOBUS_LOCATION}/bin/globus-url-copy file://$ENV{PWD}/Status gsiftp:$DPMPATH/$the_dir/Status";
+
+	    $offsetStdout = $size_file_out;
+	    ++$lastWrittenFileStdout;
+	}
+	if($size_file_out<1001000){
+	    open(FILE0,"<$out");
+	    $number_read = read(FILE0,$bufout,1000000);
+	    close FILE0;
+
+	    open FILE1, ">stdout.$lastWrittenFileStdout";
+	    print FILE1 "$bufout";
+	    close FILE1;
+	    	    
+	    system "$ENV{GLOBUS_LOCATION}/bin/globus-url-copy file://$ENV{PWD}/stdout.$lastWrittenFileStdout gsiftp:$DPMPATH/$the_dir/stdout.$lastWrittenFileStdout";
+
+	    open FILE2, ">>stdout.$lastWrittenFileStdout";
+	    print FILE2 "BlockSize: $offsetStdout TotalSize: $size_file_out\n";
+	    close FILE2;
+
+	    $diferencia_out = ($size_file_out - 1000000);
+	    system "tail -c $diferencia_out $out >> stdout.$lastWrittenFileStdout";
+
+	    system "$ENV{GLOBUS_LOCATION}/bin/globus-url-copy file://$ENV{PWD}/stdout.$lastWrittenFileStdout1 gsiftp:$DPMPATH/$the_dir/stdout.$lastWrittenFileStdout";
+
+	    open FILE1, ">>Status";
+	    print FILE1 "file: stdout sequence: $lastWrittenFileStdout size: $size_file_out\n";
+	    close FILE1;
+
+	    system "$ENV{GLOBUS_LOCATION}/bin/globus-url-copy file://$ENV{PWD}/Status gsiftp:$DPMPATH/$the_dir/Status";
+
+	    $offsetStdout = $size_file_out;
+	    ++$lastWrittenFileStdout;
+ 
+	}
+    }
+
+
+}
+
+
+sub transportnth_time_err{
+
+    $diferencia_err = 0;
+    $size_file_err = 0;
+    
+    foreach($err) 
+    {$size_file_err+=-s;print "$_ ",-s,"\n"}
+
+    if ("$size_file_err" == "$offsetStderr"){
+	
+	open FILE2, ">>stderr.$lastWrittenFileStderr";
+	print FILE2 "BlockSize: $offsetStderr TotalSize: $size_file_err\n";
+	close FILE2;
+	
+	system "$ENV{GLOBUS_LOCATION}/bin/globus-url-copy file://$ENV{PWD}/stderr.$lastWrittenFileStderr gsiftp:$DPMPATH/$the_dir/stderr.$lastWrittenFileStderr";
+
+	open FILE1, ">>Status";
+	print FILE1 "file: stderr sequence: $lastWrittenFileStderr size: $size_file_err\n";
+	close FILE1;
+
+	system "$ENV{GLOBUS_LOCATION}/bin/globus-url-copy file://$ENV{PWD}/Status gsiftp:$DPMPATH/$the_dir/Status";
+
+
+	$offsetStderr = $size_file_err;
+	++$lastWrittenFileStderr;
+	
+    }
+    elsif($size_file_err<1000000){
+
+	$diferencia_err = $size_file_err - $offsetStderr;
+
+	open FILE2, ">>stderr.$lastWrittenFileStderr";
+	print FILE2 "BlockSize: $offsetStderr TotalSize: $size_file_err\n";
+	close FILE2;
+
+	system "tail -c $diferencia_err $err >> stderr.$lastWrittenFileStderr";
+
+	system "$ENV{GLOBUS_LOCATION}/bin/globus-url-copy file://$ENV{PWD}/stderr.$lastWrittenFileStderr gsiftp:$DPMPATH/$the_dir/stderr.$lastWrittenFileStderr";
+
+	open FILE1, ">>Status";
+	print FILE1 "file: stderr sequence: $lastWrittenFileStderr size: $size_file_err\n";
+	close FILE1;
+
+	system "$ENV{GLOBUS_LOCATION}/bin/globus-url-copy file://$ENV{PWD}/Status gsiftp:$DPMPATH/$the_dir/Status";
+
+	$offsetStderr = $size_file_err;
+	++$lastWrittenFileStderr;
+    }
+	
+    elsif($size_file_err>1000000){
+	if($size_file_err>1001000){
+	    open(FILE0,"<$err");
+	    $number_read = read(FILE0,$buferr,1000000);
+	    close FILE0;
+
+	    open FILE1, ">stderr.$lastWrittenFileStderr";
+	    print FILE1 "$buferr";
+	    close FILE1;
+	    
+	    system "$ENV{GLOBUS_LOCATION}/bin/globus-url-copy file://$ENV{PWD}/stderr.$lastWrittenFileStderr gsiftp:$DPMPATH/$the_dir/stderr.$lastWrittenFileStderr";
+	    
+	    open FILE2, ">>stderr.$lastWrittenFileStderr";
+	    print FILE2 "BlockSize: $offsetStderr TotalSize: $size_file_err\n";
+	    close FILE2;
+
+	    system "tail -c 100000 $err >> stderr.$lastWrittenFileStderr";
+
+	    system "$ENV{GLOBUS_LOCATION}/bin/globus-url-copy file://$ENV{PWD}/stderr.$lastWrittenFileStderr gsiftp:$DPMPATH/$the_dir/stderr.$lastWrittenFileStderr";
+
+	    open FILE1, ">>Status";
+	    print FILE1 "file: stderr sequence: $lastWrittenFileStderr size: $size_file_err\n";
+	    close FILE1;
+
+	    system "$ENV{GLOBUS_LOCATION}/bin/globus-url-copy file://$ENV{PWD}/Status gsiftp:$DPMPATH/$the_dir/Status";
+
+	    $offsetStderr = $size_file_err;
+	    ++$lastWrittenFileStderr;
+	}
+	if($size_file_err<1001000){
+	    open(FILE0,"<$err");
+	    $number_read = read(FILE0,$buferr,1000000);
+	    close FILE0;
+
+	    open FILE1, ">stderr.$lastWrittenFileStderr";
+	    print FILE1 "$buferr";
+	    close FILE1;
+	    	    
+	    system "$ENV{GLOBUS_LOCATION}/bin/globus-url-copy file://$ENV{PWD}/stderr.$lastWrittenFileStderr gsiftp:$DPMPATH/$the_dir/stderr.$lastWrittenFileStderr";
+
+	    open FILE2, ">>stderr.$lastWrittenFileStderr";
+	    print FILE2 "BlockSize: $offsetStderr TotalSize: $size_file_err\n";
+	    close FILE2;
+
+	    $diferencia_err = ($size_file_err - 1000000);
+	    system "tail -c $diferencia_err $err >> stderr.$lastWrittenFileStderr";
+
+	    system "$ENV{GLOBUS_LOCATION}/bin/globus-url-copy file://$ENV{PWD}/stderr.$lastWrittenFileStderr1 gsiftp:$DPMPATH/$the_dir/stderr.$lastWrittenFileStderr";
+
+	    open FILE1, ">>Status";
+	    print FILE1 "file: stderr sequence: $lastWrittenFileStderr size: $size_file_err\n";
+	    close FILE1;
+
+	    system "$ENV{GLOBUS_LOCATION}/bin/globus-url-copy file://$ENV{PWD}/Status gsiftp:$DPMPATH/$the_dir/Status";
+
+	    $offsetStderr = $size_file_err;
+	    ++$lastWrittenFileStderr;
+ 
+	}
+    }
+
+
+}
+
+sub Usage{
+
+    print "grid-stdout-mon -out <std.out file name> -err <std.err file name> -vo <vo name>\n";
+}

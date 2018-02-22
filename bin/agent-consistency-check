@@ -1,0 +1,10 @@
+#!/bin/sh
+
+show-pending | grep `hostname` | awk '{print $2}' | while read JOBNAME; do
+    if [ ! -s jobs/$JOBNAME ] ; then
+        echo "Missing $JOBNAME"
+        rescue $JOBNAME
+    fi
+done
+
+exit

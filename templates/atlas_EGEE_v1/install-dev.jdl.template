@@ -1,0 +1,9 @@
+Executable = "sw-mgr";
+InputSandbox = {"SCRIPTPATH/sw-mgr"};
+OutputSandbox = {"stdout", "stderr", "install.xml"};
+stdoutput = "stdout";
+stderror = "stderr";
+Arguments = "-i RELNAME -l $VO_ATLAS_SW_DIR/software/RELNAME -p $VO_ATLAS_SW_DIR/dev/releases/VERSIONAREA -o --use-grid --grid-name GRIDNAME --replicate --release-ver REVISIONVER --host CENAME --vo atlas --require-shfs --disk-free 7000000:20000:5000000 -P SWNAME -T release -t ARCH -O opt -m PACMANVERSION --xml install.xml KITCACHE COMPILEROPT";
+Environment = {"LCG_CATALOG_TYPE=LCGCATALOGTYPE","LFC_HOST=LFCHOST"};
+VirtualOrganisation = "atlas";
+Requirements = other.GlueCEUniqueId=="CEID";

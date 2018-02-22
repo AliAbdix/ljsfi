@@ -1,0 +1,15 @@
+#!/bin/sh
+
+# Source the configuration file
+source $CONFPATH/install.conf
+
+[ "$1" != "" ] && BDII="$1" || BDII="$ATLAS_BDII"
+if [ "$BDII" == "" ] ; then
+  echo "No BDII specified and no ATLAS_BDII defined"
+  echo "Usage: `basename $0` [BDII FQDN]"
+  exit -1
+fi
+
+ldapsearch -x -P2 -h $BDII  -p 2170 -b "mds-vo-name=local,o=grid"
+
+exit

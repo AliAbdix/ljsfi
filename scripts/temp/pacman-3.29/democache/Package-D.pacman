@@ -1,0 +1,4 @@
+
+which('pwd')
+
+message("D 6")

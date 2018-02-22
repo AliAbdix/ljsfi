@@ -1,0 +1,9 @@
+Executable = "sw-mgr";
+InputSandbox = {"@SCRIPTPATH@/sw-mgr","@SCRIPTPATH@/lcg-tags"};
+OutputSandbox = {"stdout", "stderr", "install.xml"};
+stdoutput = "stdout";
+stderror = "stderr";
+Arguments = "-M @RELNAME@ --remove-tags --host @TAGHOST@ --subcluster @SCNAME@ --vo atlas --grid-name @GRIDNAME@ --tags @RELTAG@ --xml install.xml --dump-tags $OSG_APP/atlas_app/atlas_rel/tags";
+Environment = {"LCG_CATALOG_TYPE=@LCGCATALOGTYPE@","LFC_HOST=@LFCHOST@"};
+VirtualOrganisation = "atlas";
+Requirements = other.GlueCEUniqueId=="@SITE_CS@";

@@ -1,0 +1,10 @@
+#!/bin/sh
+
+#garbage-collector -m 3 -c 12% -C
+#garbage-collector -m 3 -c 13% -C
+#garbage-collector -m 3 -c 14% -C
+#garbage-collector -m 3 -c 15% -C
+garbage-collector -m 3 -c 16% -C
+garbage-collector -m 3 -c 17% -C
+
+exit

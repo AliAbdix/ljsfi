@@ -1,0 +1,62 @@
+<title>Questions asked during installations</title>
+<body background="sky.gif">
+<p>
+<h1><font color=navy>Questions asked during installations</font></h1>
+<p>
+<hr size=5>
+<p>
+    During Pacman installations, you may get asked questions about configuration or how the installation
+proceeds.  Pacman has the ability to save the answers to these questions so that if you reinstall or update
+software, you don't have to answer the questions all over again.  Here's a simple example showing how this
+works.  Do
+<b><pre><font color="#8B0000">% pacman -get Demo:Choice
+</font></pre></b>
+You will be asked a few questions which you should answer any way you like.  Now do
+<b><pre><font color="#8B0000">% pacman -l -d cmp
+</font></pre></b>
+and you will see something like this
+<b><pre><font color="#8B0000">[*] Choice, in cache [/home/youssef/Pacman/work]
+        [*] AND
+                [*] setcwd /home/youssef/Pacman/work
+                [*] setenv temporary PACMAN_INSTALLATION => /home/youssef/Pacman/work
+                [*] packageName Choice
+                [*] cache of origin Demo
+                [*] pacman source code Choice.pacman
+                [*] OR
+                        [ ] AND
+                                [ ] choice Asked [Choose a color] chosen [red] from ['red', 'green', 'blue'] user chose [blue].
+                                [ ] user message "Red"
+                        [ ] AND
+                                [ ] choice Asked [Choose a color] chosen [green] from ['red', 'green', 'blue'] user chose [blue].
+                                [ ] user message "Green"
+                        [*] AND
+                                [*] choice Asked [Choose a color] chosen [blue] from ['red', 'green', 'blue'] user chose [blue].
+                                [*] user message "Blue"
+                [*] OR
+                        [*] AND
+                                [*] choice Asked [OK to print "hello"?] chosen [y] from ['y', 'n'] user chose [y].
+                                [*] user message "hello"
+                        [ ] true
+                [*] setenv USER_CHOICE => AAAAA
+                [*] user message "Done with choices"
+                [*] setcwd /home/youssef/Pacman/work
+
+</font></pre></b>
+to see how your choices have determined what happened during the installation.  Now do
+<b><pre><font color="#8B0000">% pacman -remove
+% pacman -get Demo:Choice
+</font></pre></b>
+and you will see that the installation proceeds assuming the answers that you gave the first time.  To
+re-install ignoring the previous answers, do
+<b><pre><font color="#8B0000">% pacman -remove
+% pacman -get Demo:Choice -ignore-cookies
+</font></pre></b>
+and you will see that you get asked the questions again. 
+<p>
+Of course, this only applies to questions which are asked using the Pacman language rather than via executing
+a shell script. 
+<p>
+<hr size=5>
+<h3><a href="http://physics.bu.edu/pacman/" target="_blank">Pacman Headquarters</a></h3>
+<p>
+</body>

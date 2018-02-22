@@ -1,0 +1,9 @@
+Executable = "sw-mgr";
+InputSandbox = {"SCRIPTPATH/sw-mgr","SCRIPTPATH/gbb","SCRIPTPATH/dq2tools.validate"};
+OutputSandbox = {"stdout", "stderr", "install.xml"};
+stdoutput = "stdout";
+stderror = "stderr";
+Arguments = "-i RELNAME -l LOGPATH/latest -p PHYSPATH/VERSIONAREA -o --validate --use-grid --grid-name GRIDNAME --replicate --snapname PACKAGE --release-ver REVISIONVER --host CENAME --subcluster SCNAME --vo atlas --require-shfs --disk-free DISKSPACE --add-tags --tags RELTAG -P SWNAME -T ext -t ARCH -O opt -m PACMANVERSION --xml install.xml --no-version --setenv DQ2_LOCAL_SITE_ID=DQ2SITEID --validation-exe dq2tools.validate KITCACHE";
+Environment = {"LCG_CATALOG_TYPE=LCGCATALOGTYPE","LFC_HOST=LFCHOST"};
+VirtualOrganisation = "atlas";
+Requirements = other.GlueCEUniqueId=="CEID";

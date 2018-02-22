@@ -1,0 +1,248 @@
+#!/bin/sh
+##########################################################
+#           ATLAS PoolFileCatalog LJSFi module           #
+# Alessandro De Salvo <Alessandro.DeSalvo@roma1.infn.it> #
+##########################################################
+
+help()
+{
+  echo "HELP"
+  echo "`basename $0`: Auto request PoolCondPFC in the available sites"
+  echo "Usage: `basename $0` [OPTIONS] <release name>"
+  echo "       OPTIONS:"
+  echo "            -c|--cont           Continue the previon submissions"
+  echo "                                in case no new file is available."
+  echo "            -d|--debug          Output debug messages."
+  echo "            -e|--exclude <file> Exclude sites from <file>"
+  echo "                                (default: $EXCLUDELIST)."
+  echo "            -f|--force          Force requests"
+  echo "            -g|--grid-name      Grid name (default: $GRIDNAME)."
+  echo "            -h|--help           Display this help."
+  echo "            -s|--dsstatus <0|1> Default site status:"
+  echo "                                0=disabled, 1=enabled (default: $DSSTATUS)."
+  echo "            -t|--trial          Perform a trial run, no submission."
+  echo "            -T|--elapsed <secs> Number of seconds after the timestamp"
+  echo "                                update, before sending the requests"
+  echo "                                (default: $ELAPSED)."
+  exit 0
+}
+
+# Get the autorequest configuration
+[ -s "${CONFPATH}/autorequest.conf" ] && source ${CONFPATH}/autorequest.conf
+
+# Get the command line options
+EXCLUDELIST="${CONFPATH}/autorequest.exclude"
+TRIAL="no"
+FORCE="no"
+ELAPSED=21600
+[ -z "$GRIDNAME" ] && GRIDNAME="ALL"
+[ -z "$DSSTATUS" ] && DSSTATUS="1"
+OPTS=`getopt -o cde:g:fhs:tT: -l cont,debug,dsstatus:,elapsed:,exclude:,force,grid-name:,help,trial -- "$@"`
+if [ $? != 0 ] ; then echo "Terminating..."; exit -1 ; fi
+eval set -- "$OPTS"
+while true ; do
+        case "$1" in
+                -h|--help)         help; shift;;
+                -c|--cont)         CONTINUE="yes"; shift;;
+                -d|--debug)        DEBUG="yes"; shift;;
+                -e|--exclude)      EXCLUDELIST="$2"; shift 2;;
+                -f|--force)        FORCE="yes"; shift;;
+                -g|--grid-name)    GRIDNAME="$2"; shift 2;;
+                -s|--dsstatus)     DSSTATUS="$2"; shift 2;;
+                -t|--trial)        TRIAL="yes"; shift;;
+                -T|--elapsed)      ELAPSED="$2"; shift 2;;
+                --)                shift ; break ;;
+                \?)                break ;
+                exit ;;
+        esac
+done
+
+
+# Check the DB status
+$BINPATH/dbcheck
+rc=$?
+[ $rc -ne 0 ] && exit $rc
+
+# Check the proxy status
+$BINPATH/check-proxy
+[ $rc -ne 0 ] && exit $rc
+
+# Check for the cache directory definition
+if [ "$LJSFCACHEPATH" == "" ] ; then
+  echo "No cache dir defined. Exiting."
+  exit -1
+fi
+
+# Check and create the cache directory
+[ ! -d $LJSFCACHEPATH ] && mkdir -p $LJSFCACHEPATH
+if [ ! -d $LJSFCACHEPATH ] ; then
+  echo "Cannot create $LJSFCACHEPATH. Exiting."
+  exit -1
+fi
+
+# URLs for the Pool Condition Datasets
+POOLCOND_URL="http://atlas.web.cern.ch/Atlas/GROUPS/DATABASE/project/catrep/conddsmgr"
+
+STAMP_FILE="last_update.txt"
+STAMP_FILE_LAST="${STAMP_FILE}.last"
+POOLCOND_CACHE="${LJSFCACHEPATH}/poolcond"
+
+# Get the needed info for the tasks
+POOLCOND_TYPEID="`ljsfinfo.py --show-reltypedef="PoolCond PFC generation" | cut -d',' -f 1`"
+VALTASK="`ljsfinfo.py --show-task=validate-poolcond | cut -d',' -f 1`"
+INSTTASK="`ljsfinfo.py --show-task=install-poolcond | cut -d',' -f 1`"
+TESTTASK="`ljsfinfo.py --show-task=test-poolcond | cut -d',' -f 1`"
+UNINSTTASK="`ljsfinfo.py --show-task=uninstall-poolcond | cut -d',' -f 1`"
+CLEANTASK="`ljsfinfo.py --show-task=cleanup-poolcond | cut -d',' -f 1`"
+PUBTAGTASK="`ljsfinfo.py --show-task=publish-tag-poolcond | cut -d',' -f 1`"
+REMTAGTASK="`ljsfinfo.py --show-task=remove-tag-poolcond | cut -d',' -f 1`"
+
+# Download the files
+cd $LJSFCACHEPATH
+
+# Check poolcond status
+[ ! -d ${POOLCOND_CACHE} ] && mkdir -p ${POOLCOND_CACHE}
+cd ${POOLCOND_CACHE}
+[ "$DEBUG" == "yes" ] && echo "Using cache ${POOLCOND_CACHE}"
+if [ "$FORCE" == "no" ] ; then
+    [ -f ${STAMP_FILE} ] && mv -f ${STAMP_FILE} ${STAMP_FILE_LAST}
+    wget --quiet ${POOLCOND_URL}/${STAMP_FILE}
+    if [ -f ${STAMP_FILE_LAST} ] ; then
+        if [ -f ${STAMP_FILE} ] ; then
+            diff -q ${STAMP_FILE} ${STAMP_FILE_LAST} > /dev/null
+            POOLCOND_RC=$?
+            TS1="`cat ${STAMP_FILE} | awk '{print $1}'`"
+            TS2="`date +%s`"
+            if [ $((TS2-TS1)) -le $ELAPSED ] ; then
+                # It's too early, give a grace period of 6 hours to send the data to the sites
+                echo "Time difference is $((TS2-TS1))s"
+                echo "New files are younger than 6 hours. Skipping."
+                [ -f ${STAMP_FILE_LAST} ] && mv -f ${STAMP_FILE_LAST} ${STAMP_FILE} || rm -f ${STAMP_FILE}
+                POOLCOND_RC=0
+                TIMEDIFF=$ELAPSED
+            else
+                TIMEDIFF=$((TS2-TS1))
+                [ $POOLCOND_RC -ne 0 ] && echo "New files found (time difference = ${TIMEDIFF}s)."
+            fi
+        else
+            POOLCOND_RC=0
+        fi
+    else
+        POOLCOND_RC=1
+    fi
+else
+    # Force the requests
+    POOLCOND_RC=100
+fi
+[ "$TIMEDIFF" == "" ] && TIMEDIFF=$ELAPSED
+
+# Put a request, if needed
+if [ $POOLCOND_RC -ne 0 -o "$CONTINUE" == "yes" ] ; then
+    # Send the requests
+    [ "$DEBUG" == "yes" ] && echo "Sending requests for PoolCondPFC"
+    DQ2REL="`ljsfreq.py --queryrel --rel=DQ2% | sort | tail -n 1 | cut -d, -f 2 | sed 's#"##g'`"
+    #DQ2REL="`ljsfinfo.py  --queryrel=DQ2clients% | sort | tail -n 1 | cut -d',' -f 2 | sed 's#"##g'`"
+    RELTAG="`ljsfinfo.py --show-reltag --rel=$DQ2REL`"
+    [ "$DEBUG" == "yes" ] && echo "Requiring $RELTAG"
+    TMPL="$TEMPLATEPATH/query-poolcond-validation.jdl.template"
+    TEMPJDL="/tmp/query-poolcond-validation.$$.jdl"
+    TEMPLIST="/tmp/tmplist.$$"
+    cat $TMPL | sed "s/[@]*RELTAG[@]*/$RELTAG/g" > $TEMPJDL
+    [ "$DEBUG" == "yes" ] && cat $TEMPJDL
+
+    # Generate the release configuration
+    INSTCONF="/tmp/temp.conf.$$"
+    WMSVOCONF="/tmp/temp.wmsvoconf.$$"
+    WMSCMDCONF="/tmp/temp.wmscmdconf.$$"
+    ljsfinfo.py --queryrel=PoolCondPFC --create-conf=${INSTCONF} --create-wmsvoconf=${WMSVOCONF} --create-wmscmdconf=${WMSCMDCONF}> /dev/null 2>&1
+    if [ ! -s ${INSTCONF} ] ; then 
+        echo "No PoolCondPFC release in the database"
+        exit -1
+    fi
+        
+    # Use the generated configuration file
+    source $INSTCONF
+    rm -f $INSTCONF
+
+    # Create the final exclude list
+    EXCLLST=/tmp/ljsf.exclude.list.tmp.$$
+    [ -s $EXCLUDELIST ] && cp $EXCLUDELIST $EXCLLST
+    #ljsfinfo.py --select='distinct(site.cename)' --site-disabled --quiet | sed 's/"//g' >> $EXCLLST
+    #ljsfinfo.py --list-ce --site-disabled --quiet | sed 's/"//g' >> $EXCLLST
+    ljsfinfo.py --list-resource --site-disabled --quiet | sed 's/"//g' >> $EXCLLST
+    if [ "$DEBUG" == "yes" ] ; then
+        echo "==================="
+        echo "Using exclude list:"
+        echo "==================="
+        cat $EXCLLST
+        echo "==================="
+        cat $TEMPJDL
+        echo "==================="
+    fi
+
+    # Get info on the sites
+    LISTMATCHEXE="`echo $LJSF_JOBLISTMATCH | awk '{print $1}'`"
+    LISTMATCH="`which $LISTMATCHEXE 2>/dev/null`"
+    if [ -z "$LISTMATCH" ] ; then
+        echo "Cannot find $LJSF_JOBLISTMATCH"
+        exit -1
+    fi
+
+    [ ! -f ${EXCLLST} ] && touch ${EXCLLST}
+    ${LJSF_JOBLISTMATCH} ${CONFIGVO} ${TEMPJDL} | egrep -v -f ${EXCLLST} | grep -e ".*:2119/.*" -e ".*:8443/.*" | sed 's/ - //g' \
+                     | awk '{print $1}' | awk -F':' '{printf "%s %s\n",$0,$1}' \
+                     | sort -r | uniq -f 1 > ${TEMPLIST}.0
+    SITEINFOURL="https://atlas-install.roma1.infn.it/atlas_install/exec/siteinfo.php"
+    [ "$DEBUG" == "yes" ] && cat ${TEMPLIST}.0
+    cat ${TEMPLIST}.0 | while read line; do
+        CENAME="`echo $line | awk '{print $2}'`"
+        if [ "$CENAME" != "" ] ; then
+            TEMPSITEINFO="/tmp/siteinfo.$$"
+            get-site-info $CENAME | egrep '^GlueSiteName|^gridName' > $TEMPSITEINFO
+            SITENAME="`cat $TEMPSITEINFO | grep ^GlueSiteName | tail -n 1 | awk '{print $2}'`"
+            GNAME="`cat $TEMPSITEINFO | grep ^gridName | tail -n 1 | awk '{print $2}'`"
+            SWAREA="`curl -s -k -F "cename=$CENAME" $SITEINFOURL | sed '/^$/d' | cut -d',' -f 4`"
+            rm -f $TEMPSITEINFO
+            [ "$SWAREA" == "" ] && SWAREA="NONE"
+            [ "$GRIDNAME" == "ALL" -o "$GNAME" == "$GRIDNAME" ] && echo "$line $SITENAME $SWAREA" >> ${TEMPLIST}.1
+        fi
+    done
+    cat ${TEMPLIST}.1 2>/dev/null | sort | uniq -f 2 | awk '{print $1}' | sort > ${TEMPLIST}
+    rm -f ${TEMPJDL}
+    if [ $POOLCOND_RC -eq 0 -a "$CONTINUE" == "yes" ] ; then
+        [ "$DEBUG" == "yes" ] && echo "Excluding sites with jobs sent less than ${TIMEDIFF}s ago"
+        [ "$DEBUG" == "yes" ] && echo "Initial number of records = `cat ${TEMPLIST} | wc -l`"
+        ljsfreq.py --query --rel=PoolCondPFC --reqtype=validation --status=done --since=$((`date +%s`-TIMEDIFF)) 2> /dev/null | cut -d ',' -f 5 > ${TEMPLIST}.2
+        ljsfreq.py --query --rel=PoolCondPFC --reqtype=validation --status=autorun --since=$((`date +%s`-TIMEDIFF)) 2> /dev/null | cut -d ',' -f 5 >> ${TEMPLIST}.2
+        ljsfreq.py --query --rel=PoolCondPFC --reqtype=validation --status=accepted --since=$((`date +%s`-TIMEDIFF)) 2> /dev/null | cut -d ',' -f 5 >> ${TEMPLIST}.2
+        cat ${TEMPLIST}.2 | sort | uniq > ${TEMPLIST}.3
+        [ "$DEBUG" == "yes" ] && echo "Number of records to exclude = `cat ${TEMPLIST}.3 | wc -l`"
+        cat ${TEMPLIST} | grep -v -f ${TEMPLIST}.3 > ${TEMPLIST}.4
+        mv -f ${TEMPLIST}.4 ${TEMPLIST}
+    fi
+    NUMREQS=`cat ${TEMPLIST} | wc -l`
+    if [ $NUMREQS -gt 0 ] ; then
+        echo "Requesting $NUMREQS installations for release PoolCondPFC"
+        cat ${TEMPLIST} | while read CS; do
+            TEMPSITEINFO="/tmp/siteinfo.$$"
+            CENAME="`echo $CS | awk -F ':' '{print $1}'`"
+            get-site-info $CENAME | egrep '^GlueSiteName|^gridName' > $TEMPSITEINFO
+            SITENAME="`cat $TEMPSITEINFO | grep ^GlueSiteName | tail -n 1 | awk '{print $2}'`"
+            GNAME="`cat $TEMPSITEINFO | grep ^gridName | tail -n 1 | awk '{print $2}'`"
+            rm -f $TEMPSITEINFO
+            if [ "$TRIAL" == "yes" ] ; then
+                echo "ljsfreq.py --reqtype=validation --rel=PoolCondPFC --cs=${CS} --sitename=${SITENAME} --grid-name=$GNAME --allow-multi --status=autorun --default-site-status=$DSSTATUS 2>/dev/null"
+            else
+                ljsfreq.py --reqtype=validation --rel=PoolCondPFC --cs=${CS} --sitename=${SITENAME} --grid-name=$GNAME --allow-multi --status=autorun --default-site-status=$DSSTATUS 2>/dev/null
+            fi
+        done
+    else
+        [ "$DEBUG" == "yes" ] && echo "No request to perform"
+    fi
+    rm -f ${TEMPLIST}*
+
+    # Clean up
+    rm -f ${INSTCONF} ${WMSVOCONF} ${WMSCMDCONF} ${TEMPJDL}
+fi
+
+exit

@@ -1,0 +1,5 @@
+VO-atlas-cloud-.*
+VO-atlas-tier-T[0-9]
+VO-atlas-offline-rel.*
+VO-atlas-poolcond
+VO-atlas-dq2clients.*

@@ -1,0 +1,85 @@
+#!/bin/sh
+showhelp()
+{
+  echo "Usage: `basename $0` [OPTIONS]"
+  echo "       OPTIONS:"
+  echo "          -a|--api                       Use the AGIS API interface."
+  echo "          -c|--comments <comments>       Use customized comments."
+  echo "          -h|--help                      Show this help."
+  echo "          -r|--release <release_name>    Release name."
+  echo "          -R|--resource <resource_name>  Name of the destination resource."
+  echo "          -t|--trial                     Trial run."
+  echo "          -v|--verbose                   Increase verbosity."
+  exit 0
+}
+
+timeout () {
+    perl -e 'alarm shift; exec @ARGV' "$@";
+}
+
+TAGTASK="validation"
+
+OPTS=`getopt -o hac:d:f:r:R:s:tv -l help,api,comments:,dest:,release:,resource:,source:,trial,verbose -- "$@"`
+if [ $? != 0 ] ; then echo "Terminating..."; exit -1 ; fi
+eval set -- "$OPTS"
+while true ; do
+        case "$1" in
+                -h|--help)         showhelp; shift;;
+                -a|--api)          AGISAPI="--api"; shift;;
+                -c|--comments)     COMMENTS="$2"; shift 2;;
+                -r|--release)      RELNAME="$2"; shift 2;;
+                -R|--resource)     RESNAME="$2"; shift 2;;
+                -t|--trial)        TRIAL="y"; shift;;
+                -v|--verbose)      VERBOSE="yes"; shift;;
+                --)                shift ; break ;;
+                \?)                break ;
+                exit ;;
+        esac
+done
+
+if [ -z "$RELNAME" ] ; then
+    echo "No release specified"
+    exit 1
+fi
+
+if [ -z "$RESNAME" ] ; then
+    echo "No resource specified"
+    exit 1
+fi
+
+[ -z "$COMMENTS" ] && COMMENTS=""
+
+TMPDUMP="/tmp/clone-resource.$$.tmp"
+TMPRELLIST="/tmp/tag-resource.rellist.$$.tmp"
+TMPREL="/tmp/tag-resource.list.$$.tmp"
+curl -s -k "https://atlas-install.roma1.infn.it/atlas_install/exec/rellist.php?obsolete=0" | awk -F ': ' '{print $1}' | sed 's/ *$//g' | grep "^$RELNAME$" > $TMPRELLIST
+ljsf-infosys --info --panda-resource $RESNAME --cache --cache-timeout 7200 &> $TMPDUMP
+SITENAME="`cat $TMPDUMP | grep '^SITENAME=' | tail -n 1 | cut -d= -f 2`"
+GNAME="`cat $TMPDUMP | grep '^GRID=' | tail -n 1 | cut -d= -f 2`"
+ljsfinfo.py --quiet --select='DISTINCT(release_stat.name)' --status=installed --cs=$RESNAME | sed 's/"//g' > $TMPREL
+RELCOUNT="`cat $TMPRELLIST | wc -l`"
+RELINDX=0
+RELPROGSTEP=1
+cat $TMPRELLIST | while read RELNAME; do
+    RELINDX=$((RELINDX+1))
+    RELPROGRESS=$((100*RELINDX/RELCOUNT))
+    if [ -z "`grep ^$RELNAME$ $TMPDREL 2>/dev/null`" ] ; then
+        if [ -n "$TRIAL" ] ; then
+            echo ljsfreq.py --cs=$RESNAME --rel=$RELNAME --reqtype=$TAGTASK --sitename=$SITENAME --status=done --grid-name=$GNAME --comments="$COMMENTS" --nodeps
+            echo ljsfinfo.py --rel=$RELNAME --cs=$RESNAME --status=installed
+            echo agis-tags --add --rel=$RELNAME --panda-resource=$RESNAME $AGISAPI
+        else
+            [ -n "$VERBOSE" ] && echo "Tagging release $RELNAME in $RESNAME"
+            ljsfreq.py --cs=$RESNAME --rel=$RELNAME --reqtype=$TAGTASK --sitename=$SITENAME --status=done --grid-name=$GNAME --comments="$COMMENTS" --nodeps
+            ljsfinfo.py --rel=$RELNAME --cs=$RESNAME --status=installed
+            agis-tags --add --rel=$RELNAME --panda-resource=$RESNAME $AGISAPI
+        fi
+    else
+        echo "Skipping release $RELNAME in $RESNAME"
+    fi
+    [ $((RELPROGRESS % RELPROGSTEP)) -eq 0 ] && echo "[$RELPROGRESS% done]"
+done
+
+rm -f $TMPDUMP $TMPREL $TMPRELLIST
+
+exit

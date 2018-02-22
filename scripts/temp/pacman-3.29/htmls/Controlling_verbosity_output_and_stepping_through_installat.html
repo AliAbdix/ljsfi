@@ -1,0 +1,46 @@
+<title>Controlling verbosity, output and stepping through installations</title>
+<body background="sky.gif">
+<h1><font color=navy>Controlling verbosity, output, and stepping through installations</font></h1>
+<hr size=5>
+<p>
+You've noticed by now that Pacman's default behavior is to give you messages when performing certain operations like
+downloading files.  To control what messages you see, use the <b>-v</b> switch.  For example, if you do
+<pre><b><font color="#8B0000">% pacman -v http tar -get BU:Python
+</font></pre></b>
+you will see only <b>http</b> and <b>tar</b> related messages during the installation.  To see a complete list of such options, do
+<pre><b><font color="#8B0000">% pacman -v help
+</font></pre></b>
+Each time you use a switch with options like <b>-v</b>, <b>-d</b>, <b>-ask</b>, etc., the options that you
+choose are saved as defaults until you change them.  To see what the current defaults are, do
+<pre><b><font color="#8B0000">% pacman -def
+</font></pre></b>
+You can also use
+<pre><b><font color="#8B0000">% pacman -v none
+</font></pre></b>
+to turn off all of the options for such command line switches.
+<p>
+    Besides general verbosity, there is also a useful set of display options associated just with the <b>-l</b> and <b>-lc</b>
+commands.  For example, suppose you want to see the version numbers of all packages in the <b>BU</b> cache.  You do this with
+<pre><b><font color="#8B0000">% pacman -d version -lc BU
+</font></pre></b>
+Similarly, <b>-d help</b> gives a complete list of choices.
+<p>
+   If you are debugging some Pacman code or if you want to install cautiously, you might want to step through an
+installation.  Pacman 3 let's you do this using the <b>-ask</b> command line switch.  For example, make a new installation using
+<pre><b><font color="#8B0000">% pacman -ask action -get BU:Python
+</font></pre></b>
+The <b>action</b> option asks your permission before performing any action defined in the Pacman language.  As usual,
+you can get a list of options for <b>-ask</b> by doing <b>% pacman -ask help</b>.  When debugging, cautious or just
+curious, it is often useful to use
+<pre><b><font color="#8B0000">% pacman -ask shell -install
+</font></pre></b>
+This causes Pacman to stop and ask permission before executing any shell command defined in the language.  A more
+verbose approach is to do
+<pre><b><font color="#8B0000">% pacman -ask shell-all -install
+</font></pre></b>
+This will also ask permission whenever Pacman needs to execute a shell command, even for internal reasons.
+<p>
+<hr size=5>
+<h3><a href="http://physics.bu.edu/pacman/" target="_blank">Pacman Headquarters</a></h3>
+<p>
+</body>

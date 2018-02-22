@@ -1,0 +1,40 @@
+<title>Making and using snapshots</title>
+<body background="sky.gif">
+<p>
+<h1><font color=navy>Making and using snapshots</font></h1>
+<p>
+<hr size=5>
+<p>
+   In Pacman 3, you can freeze any cache into a self contained machine independent "snapshot" which is itself also a cache.  
+To see why you might want to do this, let's see some examples.
+<p>
+Go to a fresh working area and do <pre><b><font color="#8B0000">% pacman -snap BU
+</font></pre></b>
+This may take a little while to do all the downloads, but when it's done, you will have a file called BU.snapshot
+in your current working directory.  This is actually a directory with the same internal format as the new
+<a href="Mirrors.html">mirrors</a>.  It differs from a mirror in that you can check for updates, but you can't
+update a snapshot.  Like mirrors, snapshots can be used as caches in every sense, so you can do
+<pre><b><font color="#8B0000">% pacman -lc ~MyName/foo.snapshot
+</font></pre></b>
+or
+<pre><b><font color="#8B0000">% pacman -get ~MyName/foo.snapshot:Python
+</font></pre></b>
+list snapshots in cache list files (.caches files), etc.  Just as with other types of caches, you can use
+a snapshot locally in your file system or remotely at a URL or via SSH or gsiftp.
+<p>
+     Because installations are caches too, you can make snapshots from any software environment that you can fetch.
+For example, do
+<pre><b><font color="#8B0000">% pacman -fetch BU:Python BU:nEdit Pacman:Pacman
+% pacman -snap .
+</font></pre></b>
+Because fetching resolves all dependencies a snapshot made this way is guaranteed to be completely self contained (as long as
+all downloads are expressed in the Pacman language, of course).
+<p>
+   Note that unlike the fetch example, the first example is not guaranteed to produce a self contained snapshot because the BU
+cache may not contain all of it's dependents.  This feature let's you handle situations where you want to snapshot small caches
+without pulling in all potential downloads every time. 
+<p>
+<hr size=5>
+<h3><a href="http://physics.bu.edu/pacman/" target="_blank">Pacman Headquarters</a></h3>
+<p>
+</body>

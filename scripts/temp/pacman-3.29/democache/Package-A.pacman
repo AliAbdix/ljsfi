@@ -1,0 +1,12 @@
+#
+#   Sample package
+#
+package('Package-B')
+configure('Package-C')
+#package('PythonDocs')
+
+message("A 7")
+
+uninstallShell("echo 'foo'")
+
+downloadUntarzip('http://www.python.org/ftp/python/doc/2.3.3/html-2.3.3.tgz')

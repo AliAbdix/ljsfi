@@ -1,0 +1,8 @@
+Executable = "sw-mgr";
+InputSandbox = {"SCRIPTPATH/sw-mgr","SCRIPTPATH/lcg-tags"};
+OutputSandbox = {"stdout", "stderr", "install.xml"};
+stdoutput = "stdout";
+stderror = "stderr";
+Arguments = "--test RELNAME -p PHYSPATH -T poolcond --host CENAME --subcluster SCNAME --vo atlas --tags RELTAG --release-setup $VO_ATLAS_SW_DIR/prod/releases --xml install.xml";
+VirtualOrganisation = "atlas";
+Requirements = other.GlueCEUniqueId=="CEID";

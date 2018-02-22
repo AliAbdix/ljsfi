@@ -1,0 +1,24 @@
+# Cancel a submitted job
+cancelJob()
+{
+  JOB=$1
+  JOBNAME="`basename $JOB | sed 's/.job//g'`"
+  JOBID="`cat $JOB 2>/dev/null | grep "^[ -]*https" | sed 's/^ - //g' | awk '{print $1}'`"
+  if [ "$ASSUMEYES" == "yes" ] ; then
+     echo "y" | $LJSF_JOBCANCEL $JOBID
+  else
+     $LJSF_JOBCANCEL $JOBID
+  fi
+}
+
+# Cancel a submitted job by job ID
+cancelJobByID()
+{
+  JOBID="$1"
+  echo "Cancelling job ID $JOBID"
+  if [ "$ASSUMEYES" == "yes" ] ; then
+     echo "y" | $LJSF_JOBCANCEL $JOBID
+  else
+     $LJSF_JOBCANCEL $JOBID
+  fi
+}

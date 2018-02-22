@@ -1,0 +1,12 @@
+#!/bin/sh
+
+#Check the DB status
+$BINPATH/dbcheck
+rc=$?
+[ $rc -ne 0 ] && exit $rc
+
+#[ "$1" == "" ] && sel="job.name,job.status,description,job.submission_time,user.name" || sel="$1"
+#ljsfbkk.py --select="$sel" --validation=pending
+ljsf get job list validation=pending
+
+exit

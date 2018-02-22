@@ -1,0 +1,109 @@
+#################################################
+# LJSFi configuration file for release @RELEASE@
+# A. De Salvo - 20070725
+#################################################
+
+# Installer version
+INSTALLERVER="@INSTALLERVER@"
+
+# Install tools version
+INSTALLTOOLSVER="@INSTALLTOOLSVER@"
+
+# Architecture
+ARCH="@ARCH@"
+
+# Package (release) architecture
+RELARCH="@RELARCH@"
+
+# Release name
+SWNAME="@SWNAME@"
+
+# Revision
+REVISIONVER="@SWREVISION@"
+
+# Package name
+PACKAGE="@PACKAGE@"
+
+# Pacman platform
+PACMANPLATFORM="@PACMANPLATFORM@"
+
+# Pacman version
+PACMANVERSION="@PACMANVERSION@"
+
+# Installation area
+VERSIONAREA="@VERSIONAREA@"
+
+# Physical installation path
+PHYSPATH='@PHYSICALPATH@'
+
+# Logical installation path
+LOGPATH='@LOGICALPATH@'
+
+# Disk space needed for this release
+DISKSPACE="@DISKSPACE@"
+
+# DB release needed for this release
+DBREL="@DBRELEASE@"
+
+# Fixes for 64 bit architectures
+ATLASFIX64="@ATLASFIX64@"
+
+# ATLAS compiler installation
+ATLASCOMPILER="@ATLASCOMPILER@"
+
+# Enable posting to the KV portal
+KVPOST="@KVPOST@"
+
+# Tag name
+RELTAG="@RELTAG@"
+
+# Flag to set this release obsolete
+OBSOLETE="@OBSOLETE@"
+
+# Release category
+case "@RELCATEGORY@" in
+     none|release|poolcond|ext*) RELCATEGORY="release";;
+     analysis|*patch*)           RELCATEGORY="patch";;
+     *)                          RELCATEGORY="release";;
+esac
+
+# Main release for patches
+REQUIRES="@REQUIRES@"
+
+# Required project for patches
+REQUIREDPRJ="@REQUIREDPRJ@"
+
+# URL to the kit pacman cache (leave it empty for the automatic setup)
+KITCACHE="@KITCACHE@"
+
+# Host list (deprecated)
+HOSTLIST=$PWD/hosts
+
+# Minimal installation size (in bytes)
+MIN_INSTALL_SIZE=6000
+
+# Default BDIIs
+#ATLAS_BDII=atlas-bdii.cern.ch
+#LCG2_BDII=lcg-bdii.cern.ch
+
+# GriBB SE used for partial output dumping
+#GBB_SURL="@GBB_SURL@"
+
+# Configuration for different Brokers/BDIIs
+#CONFIGVO="--config-vo @WMSVOCONF@ --config @WMSCMDCONF@"
+#CONFIGVO="--config-vo $CONFPATH/atlas.conf --config $CONFPATH/atlas_cmd_var.conf"
+#CONFIGVO="--config-vo $CONFPATH/gridit.conf --config $CONFPATH/gridit_cmd_var.conf"
+#CONFIGVO="--config-vo $CONFPATH/cern1.conf --config $CONFPATH/cern1_cmd_var.conf"
+#CONFIGVO="--config-vo $CONFPATH/cern2.conf --config $CONFPATH/cern2_cmd_var.conf"
+#CONFIGVO="--config-vo $CONFPATH/cern3.conf --config $CONFPATH/cern3_cmd_var.conf"
+
+# Configurations for the gLite WMS
+#   Auto config from DB
+#CONFIGVO="--config @WMSCMDCONF@"
+#   Manual config (CERN)
+#CONFIGVO="--config $CONFPATH/atlas-wmsconf-cern.conf"
+#   Manual config (CNAF)
+#CONFIGVO="--config $CONFPATH/atlas-wmsconf-cnaf.conf"
+
+#LCG_GFAL_INFOSYS=lcg-bdii.cern.ch:2170
+#LCG_GFAL_INFOSYS=atlas-bdii.cern.ch:2170

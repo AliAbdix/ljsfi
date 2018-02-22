@@ -1,0 +1,11 @@
+#!/bin/sh
+
+#Check the DB status
+$BINPATH/dbcheck
+rc=$?
+[ $rc -ne 0 ] && exit $rc
+
+[ "$1" == "" ] && sel="site.name,site.cename,release_stat.name,site.arch,user.name" || sel="$1"
+ljsfinfo.py --select="$sel" --status=installed
+
+exit

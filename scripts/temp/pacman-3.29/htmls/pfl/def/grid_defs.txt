@@ -1,0 +1,59 @@
+[grid]
+[Grid atoms]
+[5]
+
+
+hasGlobusAccess(DN,localusername)
+
+hasGlobusAccess tests whether distinguished name <i>DN</i> is mapped to local username <i>localusername</i> in the standard
+globus grid-map file.
+
+
+globusAccess(DN,localusername[,position])
+
+globusAccess is the same as hasGlobusAccess except that it adds the DN to the grid-mapfile if it's not already there.  The 
+<i>position</i> argument can be <i>first</i> or <i>last</i> to specify if the <i>DN</i> is added to the beginning or end of the
+grid-mapfile.
+
+
+hasSshAccess(username,public_key)
+
+hasSshAccess tests whether <i>username</i> has access to the installation computer using the public key <i>public_key</i>.
+
+sshAccess(username,public_key)
+
+sshAccess is the same as hasSshAccess except that if the condition is not satisfied, Pacman will add the public_key to the
+authorized keys file of the user <i>username</i>.
+
+
+username(username)
+userExists(username[,group])
+groupExists(group)
+userAdd(username[,group[,shell[,homedir]]]])
+groupAdd(group)
+
+username requires that the installer be a specific username.  userExists requires that a user <b>username</b> exists on the
+installing system.  The <i>group</i> can also optionally be specified.  userAdd adds a user to the system if necessary with 
+username, group, shell and home directory as indicated.  For example
+<pre><b><font color="#8B0000">username('root')                                        # requires that only root may install the package
+userExists('youssef')                                   # requires that a username youssef exists
+userAdd('youssef','physics','/bin/csh','/home/youssef') # creates a user youssef if necessary
+</font></pre></b>
+If the installer doesn't have priviledge to perform these operations, Pacman will provide sensible error messages.
+
+
+workspace(name,environmentVariable,minmegs[,owner[,options]])
+
+workspace let's you specify an disk area in a local file system to be chosen by the installer.  You can assign such
+workspaces names (<i>name</i>) specify that a chosen environment variable (<i>environmentVariable</i>) point to the location of the
+work space, <i>minmegs</i> specifies the minimum number of megs of free disk space which must be available at installation time.  The
+optional <i>owner</i> argument let's you specify the ownership of the directory (the default owner is the installer).  The optional 
+<i>options</i> let's you specify access to the directory and whether it's temporary (to be removed on uninstallation) or permanent
+(to be kept even after uninstallation).  Permanent is the default.  Here are a couple of examples.
+<pre><b><font color="#8B0000">workspace("Bob's Temporary Sandbox",'BOB_SCRATCH',1000,'bob','ownerWrite temporary') # temp 1G space
+workspace("Bob's Permanent Data Storage",'BOB_DATA',10000,'bob','worldRead permanent')
+workspace('General scratch','SCRATCH','- any -','worldWrite temporary')
+</font></pre></b>
+Use "- any -" to let the directory be owned by the installer.  As usual, Pacman will remember the choices that the installer makes, so if a package is uninstalled and re-installed, the questions
+won't be asked unless the installer uses <b>-ignore-cookies</b>.
+

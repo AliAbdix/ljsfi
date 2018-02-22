@@ -1,0 +1,331 @@
+#!/bin/sh
+###########################
+# Get the output of a job
+# A. De Salvo - 2010
+# LJSFi framework v1.9.3
+
+source $BINPATH/$LJSF_CMDSET/status.def
+source $CONFPATH/install.conf
+
+export X509_CERT_DIR=${X509_CERT_DIR:-/etc/grid-security/certificates}
+
+#Check the DB status
+$BINPATH/dbcheck
+rc=$?
+[ $rc -ne 0 ] && exit $rc
+
+help()
+{
+  echo "Usage: `basename $0` [OPTIONS] <jobname1> ... <jobnameN>"
+  echo "       OPTIONS:"
+  echo "            -d|--debug          Output debug messages."
+  echo "            -n|--nocheck        Don't check proxy."
+  echo "            -N|--no-upload      Don't upload the logfiles to the server."
+  echo "            -h|--help           Print this help."
+  echo "            -u|--update-request Update the request, if provided."
+  echo "            -z|--compress       Compress the output files after retrieval."
+  exit 0
+}
+
+
+updateDB()
+{
+  JID="$1"
+  JOBEC="$2"
+  JOBST="$3"
+  PXOPT="$4"
+  udbrc=0
+
+  # Update release status in the DB
+  #CS="`ljsfbkk.py --quiet --select="(select s.cs from request r,site s where r.id=job.requestfk and s.ref=r.sitefk and job.requestfk<>'0')" --jobid="$JID" $PXOPT 2>/dev/null`"
+  #CS="`ljsfbkk.py --quiet --select=site.cs --jobid="$JID" $PXOPT 2>/dev/null`"
+  CS="`ljsf get job resource jobid="$JID" 2>/dev/null`"
+  if [ "$CS" != "" -a "$CS" != "None" ] ; then
+    TARGET_STATUS="`ljsfbkk.py --quiet --select="(select t.target from job j, jdl jd, task t where j.jdlfk=jd.ref and jd.type=t.name and j.id=job.id)" --jobid="$JID" $PXOPT 2>/dev/null`"
+    TARGET_REL="`ljsfbkk.py --quiet --select="(select r.name from release_stat r, job j, jdl jd where j.jdlfk=jd.ref and jd.relfk=r.ref and j.id=job.id)" --jobid="$JID" $PXOPT 2>/dev/null`"
+    if [ "$TARGET_STATUS" != "" -a "$TARGET_REL" != "" ] ; then
+      if [ $JOBEC -ne 0 ] ; then
+        #ljsfinfo.py --status="$JOBST" --cs="$CS" --rel="$TARGET_REL"
+        ljsf set release dstat status=$JOBST resource=$CS name=$TARGET_REL
+        # Plugins
+        for plugin in `\ls $BINPATH/$LJSF_CMDSET/plugins.d/get-output*.sh`; do
+          $plugin "$CS" "$TARGET_REL" failed
+          udbrc=$((udbrc+$?))
+        done
+      else
+        #ljsfinfo.py --status="$TARGET_STATUS" --cs="$CS" --rel="$TARGET_REL"
+        ljsf set release dstat status=$TARGET_STATUS resource=$CS name=$TARGET_REL
+        # Plugins
+        for plugin in `\ls $BINPATH/$LJSF_CMDSET/plugins.d/get-output*.sh`; do
+          $plugin "$CS" "$TARGET_REL" "$TARGET_STATUS"
+          udbrc=$((udbrc+$?))
+        done
+      fi
+    fi
+  else
+    udbrc=255
+  fi
+
+  # Update the request status in the DB
+  #REQID="`ljsfbkk.py --quiet --select="job.requestfk" --jobid="$JID" $PXOPT 2>/dev/null`"
+  REQID="`ljsf get job request jobid="$JID" 2>/dev/null`"
+  if [ "$REQID" != "0" -a "$REQID" != "" ] ; then
+    echo "Updating status of request $REQID"
+    #JTYPE="`ljsfbkk.py --quiet --select=jdl.type --jobid="$JID"`"
+    JTYPE="`ljsf get jdl type jobid="$JID"`"
+    if [ $JOBEC -ne 0 ] ; then
+      #ljsfreq.py --update --reqid="$REQID" --status="stopped" --comments="AutoStop after $JTYPE due to an error. Please try manual installation." &> /dev/null
+      ljsf set request status id="$REQID" status="stopped" comments="AutoStop after $JTYPE due to an error. Please try manual installation." &> /dev/null
+      udbrc=$((udbrc+$?))
+    else
+      echo "Job ID:   $JID"
+      echo "Job Type: $JTYPE"
+      if [ "$JTYPE" == "check-site" ] ; then
+        REQSTAT="`ljsfinfo.py --show-reqstatus --reqid="$REQID"`"
+        if [ "$REQSTAT" == "accepted" ] ; then
+          #ljsfreq.py --update --reqid="$REQID" --status="autorun" --comments="$JTYPE completed. Now proceeding to the next step." &> /dev/null
+          ljsf set request status id="$REQID" status="autorun" comments="$JTYPE completed. Now proceeding to the next step." &> /dev/null
+          udbrc=$((udbrc+$?))
+        else
+          #ljsfreq.py --update --reqid="$REQID" --status="$REQSTAT" --comments="$JTYPE completed. Request set to $REQSTAT due to external change." &> /dev/null
+          ljsf set request status id="$REQID" status="$REQSTAT" comments="$JTYPE completed. Request set to $REQSTAT due to external change." &> /dev/null
+          udbrc=$((udbrc+$?))
+        fi
+      elif [ "$JTYPE" == "" ] ; then
+        #ljsfreq.py --update --reqid="$REQID" --status="autorun" --comments="No job type found. Retrying." &> /dev/null
+        ljsf set request status id="$REQID" status="autorun" comments="No job type found. Retrying." &> /dev/null
+        udbrc=$((udbrc+$?))
+      else
+        #ljsfreq.py --update --reqid="$REQID" --status="done" --comments="Task completed successfully" &> /dev/null
+        ljsf set request status id="$REQID" status="done" comments="Task completed successfully" &> /dev/null
+        udbrc=$((udbrc+$?))
+      fi
+    fi
+  fi
+  return $udbrc
+}
+
+
+# Get the command line options
+PROXYCHECK="yes"
+UPDATEREQ="no"
+UPLOAD="yes"
+OPTS=`getopt -o dhnNuz -l debug,help,nocheck,compress,no-upload,update-request -- "$@"`
+if [ $? != 0 ] ; then echo "Terminating..."; exit -1 ; fi
+eval set -- "$OPTS"
+while true ; do
+        case "$1" in
+                -h|--help)           help; shift;;
+                -d|--debug)          DEBUG="yes"; shift;;
+                -n|--nocheck)        PROXYCHECK="no"; shift;;
+                -N|--no-upload)      UPLOAD="no"; shift;;
+                -u|--update-request) UPDATEREQ="yes"; shift;;
+                -z|--compress)       COMPRESS="yes"; shift;;
+                --)                  shift ; break ;;
+                \?)                  break ;
+                exit ;;
+        esac
+done
+
+#Check the proxy status
+if [ "$PROXYCHECK" == "yes" ] ; then
+  PROXYOPT=""
+  $BINPATH/check-proxy
+  rc=$?
+  [ $rc -ne 0 ] && exit $rc
+else
+  PROXYOPT="--min-proxy-lt=0"
+fi
+
+TMPFILE=tmp.$$
+while [ "`basename X$1`" != "X" -a "`basename X$1`" != "X*" ] ; do
+  JOB=$1; shift
+  JOBALL=0
+  JOBNAME="`basename $JOB | sed 's/.job//g'`"
+  JOBID="`cat $JOB 2>/dev/null | grep "^PandaID" | sed 's/^PandaID=\(.*\)/\1/'`"
+  if [ "$JOBID" != "" ] ; then
+    STATUS="`getStatus $JOBID $PROXYOPT | cut -d '|' -f 1 | sed 's/ $//g'`"
+    DATETIME="`date +%Y%m%d-%H%M`"
+    OUTDIR=`dirname $JOB | awk -F '/' 'BEGIN {} { for (i=1; i<NF;i++) printf $i"/"} END {printf "\n"}'`output/$JOBNAME-$DATETIME
+
+    #JDLCHECK="`ljsfbkk.py --select=jdl.name --jobid=$JOBID --quiet 2>/dev/null`"
+    JDLCHECK="`ljsf get jdl name jobid=$JOBID 2>/dev/null`"
+    if [ "$STATUS" = "finished" -o "$STATUS" = "failed" ] ; then
+      #OUTINFO="`ljsfbkk.py --select=output --jobid=${JOBID} --quiet`"
+      OUTINFO="`ljsf get job output jobid=${JOBID}`"
+      JOBLOG="`echo ${OUTINFO} | cut -d, -f 3 | sed 's/^ *\(.*\)/\1/'`"
+      JOBLOGDONE=0
+      #JOBEXITCODE="`ljsfbkk.py --select=job.exit_code --jobid="$JOBID" --quiet`"
+      JOBEXITCODE="`ljsf get job exit-code jobid="$JOBID"`"
+      if [ "$JOBLOG" = "None" ] ; then
+        printf "Getting the output of %s\n" "$JOBNAME"
+        [ ! -d ${OUTDIR} ] && mkdir ${OUTDIR}
+        #gbb -l 250 $LJSF_JOBGETOUTPUT --dir ${OUTDIR} ${JOBID} > $TMPFILE
+        $LJSF_JOBGETOUTPUT -t 250 --dir ${OUTDIR} ${JOBID} > $TMPFILE
+        jgort=$?
+        echo "################"
+        cat $TMPFILE
+        echo "################"
+        rm -fr $TMPFILE
+        [ -z "$JOBEXITCODE" -o "$JOBEXITCODE" = "None" ] && JOBEXITCODE=0
+        [ $JOBEXITCODE -eq 0 -a "$STATUS" = "failed" ] && JOBEXITCODE=100
+        if [ $jgort -eq 0 ] ; then
+          echo "Output of $JOBNAME saved"
+          if [ -s "$OUTDIR/install.xml" ] ; then
+            JOBINFO="--jobinfo=$OUTDIR/install.xml"
+            # Override the exit code with the one in the xml file, if available
+            JOBEXITCODE_XML="`grep '<.*type="EXIT".*>' $OUTDIR/install.xml | tail -n 1 | sed 's/<.*type="EXIT".*>\([0-9]*\)<.*>/\1/'`"
+            if [ "$STATUS" != "failed" -a -n "$JOBEXITCODE_XML" ] ; then
+              echo "${JOBNAME}> Exit code from from install.xml is ${JOBEXITCODE_XML} [STATUS: ${STATUS}]"
+              JOBEXITCODE=$JOBEXITCODE_XML
+            fi
+          else
+            JOBINFO=""
+          fi
+
+          # Upload the logfiles
+          loguprc=0
+          if [ "$UPLOAD" == "yes" ] ; then
+            TMPLOG="/tmp/install.log.$$"
+            rm -f ${TMPLOG}
+            for LOGF in `\ls $OUTDIR/payload*.txt 2>/dev/null`; do
+              echo "----------- `basename $LOGF` BEGIN -----------" >> ${TMPLOG}
+              echo
+              cat $OUTDIR/`basename $LOGF` >> ${TMPLOG}
+              echo
+              echo "----------- `basename $LOGF` END ----------" >> ${TMPLOG}
+            done
+            if [ -s ${TMPLOG} ] ; then
+              gzip -9 ${TMPLOG}
+              [ -s ${TMPLOG}.gz ] && ljsflog.py --jobid="$JOBID" --logfile="${TMPLOG}.gz"
+              loguprc=$?
+              rm -f ${TMPLOG}*
+            fi
+          fi
+
+          # Compress the logfiles on disk
+          [ "$COMPRESS" != "" ] && (rm -fr $OUTDIR/payload*.gz && gzip -r -q -9 $OUTDIR/payload*)
+
+          # Overall completion code
+          [ $loguprc -eq 0 ] && JOBLOGDONE=1
+        else
+          echo "Cannot save the output of $JOBNAME"
+          echo "Moving the job to ${JOBSPATH}.ERR"
+          mv -f $JOB ${JOBSPATH}.ERR
+          JOBLOGDONE=1
+        fi
+      else
+        JOBLOGDONE=1
+      fi
+
+      # Simulate the exit code if not available
+      if [ -z "$JOBEXITCODE" ] ; then
+        [ "$STATUS" = "finished" ] && JOBEXITCODE=0 || JOBEXITCODE=200
+      fi
+
+
+      # Update the job bookkeeping
+      JOBBKKDONE=0
+      JOBDBUPDATEDONE=0
+      JOBUNLOCKDONE=0
+      if [ -n "$JDLCHECK" ] ; then
+          # Remove the job lock
+          #ljsfinfo.py --remove-lock --jobid="$JOBID" $PROXYOPT
+          #[ $? -eq 0 -o $? -eq 111 -o $? -eq 112 ] && JOBUNLOCKDONE=1 || echo "REMOVE LOCK ECODE: $?"
+          #RLRC="`curl -S -s -X PUT --capath $X509_CERT_DIR --cert $X509_USER_PROXY --key $X509_USER_PROXY "$LJSFDBURL/joblock.php?jobid=$JOBID&unlock"`"
+          #[ "$RLRC" == "0" ] && JOBUNLOCKDONE=1 || echo "REMOVE LOCK ECODE: $RLRC"
+          ljsf del job lock jobid=$JOBID
+          [ $? -eq 0 ] && JOBUNLOCKDONE=1 || echo "REMOVE LOCK ECODE: $?"
+
+          # Update the job status
+          if [ $JOBEXITCODE -ne 0 ] ; then
+            ljsfbkk.py --insert --jobid="$JOBID" --rettime="`date +'%Y-%m-%d %H:%M:%S'`" --validation="failed" $PROXYOPT $JOBINFO
+            [ $? -ne 0 ] && echo "Cannot update job ID $JOBID ($JOBNAME) to FAILED" || JOBBKKDONE=1
+            JOBSTATUS="failed"
+          else
+            ljsfbkk.py --insert --jobid="$JOBID" --rettime="`date +'%Y-%m-%d %H:%M:%S'`" --validation="ok" $PROXYOPT $JOBINFO
+            [ $? -ne 0 ] && echo "Cannot update job ID $JOBID ($JOBNAME) to OK" || JOBBKKDONE=1
+            JOBSTATUS="done"
+          fi
+
+          if [ -n "$JOBINFO" -a -n "$COMPRESS" ] ; then
+              # Compress the xml files on disk
+              rm -fr $OUTDIR/*.xml.gz
+              gzip -r -q -9 $OUTDIR/*.xml
+          fi
+
+          # Update the DB
+          updateDB $JOBID $JOBEXITCODE $JOBSTATUS $PROXYOPT
+          [ $? -eq 0 -o $? -eq 255 ] && JOBDBUPDATEDONE=1
+          DBUPDATEID=$JOBID
+      else
+          echo "No JDL found, skipping DB update"
+          JOBUNLOCKDONE=1
+          JOBBKKDONE=1
+          JOBDBUPDATEDONE=1
+      fi
+
+
+      # Cleanup the partial dumps from GriBB
+      #gbbc -c -v -s $GBB_SURL $JOBID
+
+      if [ $JOBLOGDONE -eq 1 -a $JOBBKKDONE -eq 1 -a $JOBUNLOCKDONE -eq 1 -a $JOBDBUPDATEDONE -eq 1 ] ; then
+        echo "deleting job $JOBNAME with status $STATUS"
+        rm -f $JOB
+      else
+        echo "LOG|BKK|UNLOCK|UPDATE = $JOBLOGDONE|$JOBBKKDONE|$JOBUNLOCKDONE|$JOBDBUPDATEDONE"
+      fi
+    elif [ "$STATUS" = "cancelled" -o "$STATUS" = "closed" ] ; then
+      JOBBKKDONE=0
+      JOBUNLOCKDONE=0
+      JOBDBUPDATEDONE=0
+      if [ -n "$JDLCHECK" ] ; then
+          ljsfbkk.py --insert --jobid="$JOBID" --rettime="`date +'%Y-%m-%d %H:%M:%S'`" --validation="failed" $PROXYOPT
+          [ $? -ne 0 ] && echo "Cannot update job ID $JOBID ($JOBNAME)" || JOBBKKDONE=1
+          #ljsfinfo.py --remove-lock --jobid="$JOBID" $PROXYOPT
+          #[ $? -ne 0 ] && echo "Cannot remove lock on $JOBNAME" || JOBUNLOCKDONE=1
+          #RLRC="`curl -S -s -X PUT --capath $X509_CERT_DIR --cert $X509_USER_PROXY --key $X509_USER_PROXY "$LJSFDBURL/joblock.php?jobid=$JOBID&unlock"`"
+          #[ "$RLRC" != "0" ] && echo "Cannot remove lock on $JOBNAME" || JOBUNLOCKDONE=1
+          ljsf del job lock jobid=$JOBID
+          [ $? -ne 0 ] && echo "Cannot remove lock on $JOBNAME" || JOBUNLOCKDONE=1
+
+          # Update the DB
+          updateDB $JOBID 100 $STATUS $PROXYOPT
+          JOBDBUPDATEDONE=1
+          DBUPDATEID=$JOBID
+
+          # Cleanup the partial dumps from GriBB
+          #gbbc -c -v -s $GBB_SURL $JOBID
+      else
+          echo "No JDL found, skipping DB update"
+          JOBUNLOCKDONE=1
+          JOBBKKDONE=1
+          JOBDBUPDATEDONE=1
+      fi
+
+      if [ $JOBBKKDONE -eq 1 -a $JOBUNLOCKDONE -eq 1 -a $JOBDBUPDATEDONE -eq 1 ] ; then
+        echo "deleting $STATUS job $JOBNAME with status $STATUS"
+        rm -f $JOB
+      fi
+    elif [ "$STATUS" = "" ] ; then
+      echo "Status of job $JOBNAME is unknown. Moving the jobfile to ${JOBSPATH}.ERR"
+      mv -f $JOB "${JOBSPATH}.ERR"
+      if [ -n "$JOBID" -a -n "$JDLCHECK" ] ; then
+         #ljsfinfo.py --remove-lock --jobid="$JOBID" $PROXYOPT
+         #RLRC="`curl -S -s -X PUT --capath $X509_CERT_DIR --cert $X509_USER_PROXY --key $X509_USER_PROXY "$LJSFDBURL/joblock.php?jobid=$JOBID&unlock"`"
+         ljsf del job lock jobid=$JOBID
+         updateDB $JOBID 200 unknown $PROXYOPT
+      fi
+    else
+      echo "Status of job $JOBNAME is \"$STATUS\". Skipping"
+    fi
+  else
+    if [ -f "$JOBNAME" ] ; then
+      echo "Error processing job $JOBNAME. Moving the job data to ${JOBSPATH}.ERR"
+      [ ! -d "${JOBSPATH}.ERR" ] && mkdir -p "${JOBSPATH}.ERR"
+      mv $JOB "${JOBSPATH}.ERR"
+    fi
+  fi
+done
+
+exit

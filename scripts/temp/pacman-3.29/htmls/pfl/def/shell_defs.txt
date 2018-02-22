@@ -1,0 +1,61 @@
+[shell]
+[Shells]
+[3]
+
+
+shell(command)
+shellDialogue(command)
+
+shell and shellDialogue let you execute standard shell commands as part of a Pacman installation.  In general, you should
+use Pacman syntax instead of shell commands whenever possible for several reasons:
+<ul>
+<li> Pacman commands maintain their correctness over time and automatically "undo" themselves when packages are uninstalled.
+<li> shell commands are executed as subprocesses, so you can't affect the installation environment variables by executing a script or shell
+command.
+<li> From the point of view of a cautious installer, shell commands are a potential danger.
+</ul>
+Several command line switches in <b>-v help</b> and <b>-ask help</b> relate to shell commands.  An installer can, for instance, use 
+<b>-ask shell</b> and Pacman will stop and ask permission before executing any of these shell commands.  From the Pacman
+perspective, if a shell command returns no exit code, it is considered to have successfully executed.  The shell atom sends sysout
+to a log file, so if you are executing a script that interacts with the installer, you should use shellDialogue.
+
+
+shellOutputContains(command,text)
+
+shellOutputContains executes the shell command <i>command</i> and requires that the output contains <i>text</i>.
+
+
+shellOutputEQ(command,text)
+shellOutputLE(command,text)
+shellOutputLT(command,text)
+shellOutputGE(command,text)
+shellOutputGT(command,text)
+
+shellOutputEQ,LE,LT,GE,GT let's you compare the output of a shell command to a provided string.  This is convenient for 
+requiring versions of natively installed software.  For example, if you want to require GNU Wget at least version 1.9, you can 
+do
+<b><pre><font color="#8B0000">shellOutputGE('wget -v','GNU Wget 1.9')
+</font></pre></b>
+this requires both that wget is available and that the start of the resulting output matches or exceeds the provided string.
+
+
+uninstallShell(command)
+
+uninstallShell let's you specify shell commands which are only executed when a package is uninstalled.  This is typically 
+useful for cleaning up the result of other shell commands.
+
+setup(command)
+
+Setup let's you put code directly into the <b>setup.csh(sh)</b> scripts that Pacman generates when
+you use <b>-setup</b> or <b>-get</b>.  <b>command</b> is put directly into the scripts with the
+following modifications
+<ul>
+<li> Any string <b>SHELL</b> is replaced by "csh" and "sh" in setup.csh and setup.sh repectively.
+<li> Any string <b>source</b> is replaced by ". " in setup.sh.
+<li> Environment variables are evaluated.
+</ul>
+A typical use is
+<pre><b><font color="#8B0000">setup('source $MYPACKAGE_LOCATION/mySetup.SHELL')
+</font></pre></b>
+which causes <b>mySetup.csh</b> and <b>mySetup.sh</b> to be sourced from the standard Pacman generated
+setup scripts.

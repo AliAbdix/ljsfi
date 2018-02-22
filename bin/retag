@@ -1,0 +1,107 @@
+#!/bin/sh
+
+###########################
+# Retag a site
+# A. De Salvo - 2011
+# LJSFi framework v1.2
+
+help()
+{
+  echo "HELP"
+  echo "`basename $0`: Retag a site from the informations in the installation DB"
+  echo "Usage: `basename $0` [OPTIONS] <site name>"
+  echo "       OPTIONS:"
+  echo "            -d|--debug             Output debug messages."
+  echo "            -h|--help              Display this help."
+  echo "            -s|--site              Consider the full site."
+  echo "            -t|--trial             Perform a trial run, no action."
+  exit 0
+}
+
+# Read the configuration file, if present
+[ -s "$CONFPATH/rmanager.conf" ] && source $CONFPATH/rmanager.conf
+
+# Get the command line options
+TRIAL="no"
+OPTS=`getopt -o dhst -l debug,help,site,trial -- "$@"`
+if [ $? != 0 ] ; then echo "Terminating..."; exit -1 ; fi
+eval set -- "$OPTS"
+while true ; do
+        case "$1" in
+                -h|--help)         help; shift;;
+                -d|--debug)        DEBUG="yes"; shift;;
+                -t|--trial)        TRIAL="yes"; shift;;
+                -s|--site)         SITE="yes"; shift;;
+                --)                shift ; break ;;
+                \?)                break ;
+                exit ;;
+        esac
+done
+SITENAME="${1}"
+if [ "$SITENAME" == "" ] ; then
+    echo "No site name specified"
+    help
+    exit -1
+fi
+
+#Check the DB status
+$BINPATH/dbcheck
+rc=$?
+[ $rc -ne 0 ] && exit $rc
+
+#Check the proxy status
+$BINPATH/check-proxy
+
+# Get info on the installed releases in the site and build the tag string
+TEMPTAGS="/tmp/tag.$$"
+ljsfinfo.py --select="distinct(site.cs)" --sitename=${SITENAME} --quiet | sed 's#"##g' | \
+while read CS ; do
+  rm -f ${TEMPTAGS}
+  [ "$SITE" == "yes" ] && TAGRESOURCE="--sitename=${SITENAME}" || TAGRESOURCE="--cs=${CS}"
+  SITETAGS="`ljsfinfo.py --list-tags ${TAGRESOURCE} | awk '{print $1}'`"
+  if [ "$SITETAGS" != "" -a "`echo $SITETAGS | tr '[A-Z]' '[a-z]'`" != "none" ] ; then
+    echo -n ${SITETAGS}>${TEMPTAGS}
+  else
+    echo "Warning: no site tags for ${TAGRESOURCE}"
+  fi
+  ljsfinfo.py --select="distinct(release_stat.name)" \
+              --status=installed ${TAGRESOURCE} --quiet | sed 's#"##g' | \
+  while read RELEASE; do
+     TAG="`ljsfinfo.py --show-reltag --rel=${RELEASE}`"
+     if [ "$TAG" != "" -a "$TAG" != "None" ] ; then
+       [ -s ${TEMPTAGS} ] && echo -n "," >> ${TEMPTAGS}
+       echo -n $TAG >> ${TEMPTAGS}
+     else
+       echo "Warning: tag for release ${RELEASE} is \"$TAG\""
+     fi
+  done
+  if [ -s "${TEMPTAGS}" ] ; then
+    GRIDNAME="`get-site-info ${CS} | grep -i ^gridName | tail -n 1 | cut -d: -f 2- | sed 's/^ *//g'`"
+    TAGINFO="`get-tagging-info $CS`"
+    TAGTYPE="`echo $TAGINFO | cut -d: -f 1`"
+    TAGHOST="`echo $TAGINFO | cut -d: -f 2`"
+    if [ "$GRIDNAME" == "OSG" ] ; then
+      TAGUTIL="osg-tags"
+      TAGTYPE="ce"
+    else
+      TAGUTIL="lcg-tags"
+    fi
+    [ "$VERBOSE" == "y" ] && echo "Tagging tool is $TAGUTIL"
+    if [ "$TAGTYPE" == "ce" ] ; then
+      if [ "$TRIAL" == "yes" ] ; then
+        echo $TAGUTIL --vo atlas --add --ce ${TAGHOST} --tags `cat ${TEMPTAGS}`
+      else
+        $TAGUTIL --vo atlas --add --ce ${TAGHOST} --tags `cat ${TEMPTAGS}`
+      fi
+    else
+      if [ "$TRIAL" == "yes" ] ; then
+        echo $TAGUTIL --vo atlas --add --sc ${TAGHOST} --tags `cat ${TEMPTAGS}`
+      else
+        $TAGUTIL --vo atlas --add --sc ${TAGHOST} --tags `cat ${TEMPTAGS}`
+      fi
+    fi
+  fi
+  rm -f ${TEMPTAGS}
+done
+
+exit 0

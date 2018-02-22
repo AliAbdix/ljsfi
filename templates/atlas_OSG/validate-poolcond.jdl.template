@@ -1,0 +1,9 @@
+Executable = "sw-mgr";
+InputSandbox = {"@SCRIPTPATH@/sw-mgr","@SCRIPTPATH@/getFrontierEnv.py","@SCRIPTPATH@/lcg-tags"};
+OutputSandbox = {"stdout", "stderr", "install.xml"};
+stdoutput = "stdout";
+stderror = "stderr";
+Arguments = "-i @RELNAME@ -p @OSGPHYSICALPATH@ --validate --ddm-setup $OSG_APP/atlas_app/atlas_rel/ddm/latest/setup.sh --poolcond-pattern @SWNAME@ --host @TAGHOST@ --subcluster @SCNAME@ --grid-name @GRIDNAME@ --vo atlas --require-shfs --add-tags --rm-tags-on-fail --tags @RELTAG@ -T poolcond --ddm-site @SITE_HOTDISK@ --goc-name @GOCNAME@ --release-setup $OSG_APP/atlas_app/atlas_rel/prod/releases --xml install.xml --site-config $OSG_APP/atlas_app/atlas_rel/AtlasSiteConfig.sh --local-config $OSG_APP/atlas_app/atlas_rel/local --poolcond-copy";
+VirtualOrganisation = "atlas";
+Environment = {"LCG_CATALOG_TYPE=@LCGCATALOGTYPE@","LFC_HOST=@LFCHOST@","LCG_GFAL_INFOSYS=is.grid.iu.edu:2170"};
+Requirements = other.GlueCEUniqueId=="@SITE_CS@";

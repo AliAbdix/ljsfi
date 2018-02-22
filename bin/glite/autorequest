@@ -1,0 +1,281 @@
+#!/bin/sh
+
+###########################
+# Autorequest a release
+# AIR module
+# A. De Salvo - 2011
+# LJSFi framework v1.9.5
+
+help()
+{
+  echo "HELP"
+  echo "`basename $0`: Auto request the installations of a release in the available sites"
+  echo "Usage: `basename $0` [OPTIONS] <release name>"
+  echo "       OPTIONS:"
+  echo "            -a|--all            Use all releases (default: production)."
+  echo "            -c|--tcm <file>     Enable the task change map from <file>"
+  echo "                                (default: $TASKCHANGEMAP)."
+  echo "            --cvmfs-available   Select releases available in cvmfs"
+  echo "            --cvmfs-unavailable Select releases unavailable in cvmfs"
+  echo "            --has-cvmfs         Select sites using cvmfs"
+  echo "            --no-cvmfs          Select sites not using cvmfs"
+  echo "            -d|--debug          Output debug messages."
+  echo "            -e|--exclude <file> Exclude sites from <file>"
+  echo "                                (default: $EXCLUDELIST)."
+  echo "            -h|--help           Display this help."
+  echo "            -o|--obsolete       Use obsolete releases (default: production)."
+  echo "            -b|--base           Auto request base releases."
+  echo "            -p|--patch          Auto request patch releases."
+  echo "            -g|--grid-name      Grid name (default: $GRIDNAME)."
+  echo "            -s|--dsstatus <0|1> Default site status:"
+  echo "                                0=disabled, 1=enabled (default: $DSSTATUS)."
+  echo "            -t|--trial          Perform a trial run, no submission."
+  echo "            -T|--task           Use the specified task"
+  echo "                                (default: $TASK)."
+  echo "            --target <tgt>      Perform requests for target <tgt>."
+  echo "            --template <tmpl>   Use the template <tmpl>."
+  exit 0
+}
+
+taskChange()
+{
+  local CS="$1"
+  local TASK="$2"
+  cat $TASKCHANGEMAP | egrep -v '^#|^$' | while read TCM; do
+      RESPATT="`echo $TCM | cut -d, -f 1`"
+      FROMTASK="`echo $TCM | cut -d, -f 2`"
+      TOTASK="`echo $TCM | cut -d, -f 3`"
+      echo ${CS},${TASK} | grep "${RESPATT},${FROMTASK}" &> /dev/null
+      [ $? -eq 0 ] && echo ${TOTASK}
+  done
+}
+
+# Get the autorequest configuration
+[ -s "${CONFPATH}/autorequest.conf" ] && source ${CONFPATH}/autorequest.conf
+
+# Get the command line options
+EXCLUDELIST="${CONFPATH}/autorequest.exclude"
+TASKCHANGEMAP="${CONFPATH}/autorequest.tcm"
+TRIAL="no"
+TASK="validation"
+RELOPT="--production"
+[ -z "$GRIDNAME" ] && GRIDNAME="ALL"
+[ -z "$DSSTATUS" ] && DSSTATUS="1"
+OPTS=`getopt -o ac:bde:g:hops:tT: -l all,base,debug,dsstatus:,exclude:,grid-name:,cvmfs-available,cvmfs-unavailable,has-cvmfs,help,no-cvmfs,obsolete,patch,target:,tcm:,template:,trial,task: -- "$@"`
+if [ $? != 0 ] ; then echo "Terminating..."; exit -1 ; fi
+eval set -- "$OPTS"
+while true ; do
+        case "$1" in
+                -h|--help)           help; shift;;
+                -a|--all)            RELOPT=""; shift;;
+                -c|--tcm)            TASKCHANGEMAP="$2"; shift 2;;
+                --cvmfs-available)   CVMFSOPT="--cvmfs-available"; shift;;
+                --cvmfs-unavailable) CVMFSOPT="--cvmfs-unavailable"; shift;;
+                --has-cvmfs)         HASCVMFS="yes"; shift;;
+                --no-cvmfs)          HASCVMFS="no"; shift;;
+                -d|--debug)          DEBUG="yes"; shift;;
+                -b|--base)           RELFILTER="--base"; shift;;
+                -p|--patch)          RELFILTER="--patch"; shift;;
+                -e|--exclude)        EXCLUDELIST="$2"; shift 2;;
+                -g|--grid-name)      GRIDNAME="$2"; shift 2;;
+                -s|--dsstatus)       DSSTATUS="$2"; shift 2;;
+                -t|--trial)          TRIAL="yes"; shift;;
+                -T|--task)           TASK="$2"; shift 2;;
+                --target)            TARGET="$2"; shift 2;;
+                --template)          TMPL="$2"; shift 2;;
+                -o|--obsolete)       RELOPT="--obsolete"; shift;;
+                --)                  shift ; break ;;
+                \?)                  break ;
+                exit ;;
+        esac
+done
+RELEASE="${1}"
+INSTCONF="/tmp/temp.conf.$$"
+WMSVOCONF="/tmp/temp.wmsvoconf.$$"
+WMSCMDCONF="/tmp/temp.wmscmdconf.$$"
+
+# Check the DB status
+$BINPATH/dbcheck
+rc=$?
+[ $rc -ne 0 ] && exit $rc
+
+# Check the proxy status
+$BINPATH/check-proxy
+
+# Create the final exclude and include list
+EXCLLST=/tmp/ljsf.exclude.list.tmp.$$
+INCLLST=/tmp/ljsf.include.list.tmp.$$
+[ -s $EXCLUDELIST ] && cp $EXCLUDELIST $EXCLLST
+#ljsfinfo.py --list-ce --site-disabled --quiet | sed 's/"//g' >> $EXCLLST
+ljsfinfo.py --list-resource --site-disabled --quiet | sed 's/"//g' >> $EXCLLST
+if [ "$IGNORE_CVMFS_REMOVALS" = "y" -a "$TASK" = "removal" ] ; then
+    #ljsfinfo.py --list-ce --has-cvmfs --quiet | sed 's/"//g' >> $EXCLLST
+    ljsfinfo.py --list-resource --has-cvmfs --quiet | sed 's/"//g' >> $EXCLLST
+fi
+
+[ "$HASCVMFS" = "yes" ] && ljsfinfo.py --list-ce --has-cvmfs --quiet | sed 's/"//g' >> $INCLLST
+[ "$HASCVMFS" = "no" ]  && ljsfinfo.py --list-ce --has-cvmfs --quiet | sed 's/"//g' >> $EXCLLST
+
+if [ "$DEBUG" == "yes" ] ; then
+    if [ -f ${EXCLLST} ] ; then
+        echo "==================="
+        echo "Using exclude list:"
+        echo "==================="
+        cat $EXCLLST
+        echo "==================="
+    fi
+    if [ -f ${INCLLST} ] ; then
+        echo "==================="
+        echo "Using include list:"
+        echo "==================="
+        cat $INCLLST
+        echo "==================="
+    fi
+fi
+
+# Check if a release has been specified and generate the configuration file
+if [ "$RELEASE" == "" ] ; then
+    echo "No release specified. Using the full list from the database."
+    RELEASE="%"
+fi
+if [ "$TARGET" != "ignore" ] ; then
+    [ "$TARGET" = "" ] && AITARGET="--autoinstall" || AITARGET="--autoinstall-target=$TARGET"
+fi
+
+TEMPSITEINFO="/tmp/siteinfo.$$"
+TEMPRELSUB="/tmp/relsub.$$"
+ljsfinfo.py --queryrel=${RELEASE} $RELOPT $RELFILTER $AITARGET $CVMFSOPT \
+            2> /dev/null | cut -d "," -f 2 | cut -d "=" -f 2 | sed 's#\"##g' | \
+while read RELNAME; do
+    echo "Processing release $RELNAME"
+    ljsfinfo.py --queryrel=${RELNAME} --create-conf=${INSTCONF} --create-wmsvoconf=${WMSVOCONF} --create-wmscmdconf=${WMSCMDCONF}> /dev/null 2>&1
+    if [ ! -s ${INSTCONF} ] ; then
+        echo "No matching release (${RELNAME}) in the database"
+        exit -1
+    fi
+
+    # Use the generated configuration file
+    source $INSTCONF
+    rm -f $INSTCONF
+
+    # Get info on the sites
+    LISTMATCHEXE="`echo $LJSF_JOBLISTMATCH | awk '{print $1}'`"
+    LISTMATCH="`which $LISTMATCHEXE 2>/dev/null`"
+    if [ -z "$LISTMATCH" ] ; then
+        echo "Cannot find $LJSF_JOBLISTMATCH"
+        exit -1
+    fi
+    if [ "$TMPL" == "" ] ; then
+        TEMPLATE="$TEMPLATEPATH/query-${TASK}.jdl.template"
+    else
+        TEMPLATE="$TEMPLATEPATH/${TMPL}.jdl.template"
+    fi
+    if [ ! -s "${TEMPLATE}" ] ; then
+        echo "Cannot find template file ${TEMPLATE}"
+        exit -1
+    fi
+    TEMPJDL="/tmp/query-${TASK}.$$.jdl"
+    TEMPLIST="tmplist.$$"
+    if [ "$REQUIRES" != "" ] ; then
+        R1="`echo $REQUIRES | cut -d, -f 1`"
+        R2="`echo $REQUIRES | cut -d, -f 2`"
+        RELREQ="`ljsfinfo.py --show-reltag --rel=$R1`"
+        REQUIRES=$R2
+    fi
+    cat ${TEMPLATE} | sed -e "s#[@]*RELTAG[@]*#$RELTAG#g" \
+                          -e "s#[@]*RELREQ[@]*#$RELREQ#g" > ${TEMPJDL}
+    if [ "$DEBUG" == "yes" ] ; then
+        echo "====================="
+        echo "Generated JDL follows"
+        echo "====================="
+        cat ${TEMPJDL}
+        echo "====================="
+    fi
+    
+    [ ! -f ${EXCLLST} ] && touch ${EXCLLST}
+    [ "$DEBUG" == "yes" ] && echo "Using ${CONFIGVO}"
+    [ "$DEBUG" == "yes" ] && cat `echo ${CONFIGVO} | awk '{print $NF}'`
+    [ "$DEBUG" == "yes" ] && echo "===> ${LJSF_JOBLISTMATCH} ${CONFIGVO} ${TEMPJDL}"
+    # Renew the proxy delegations
+    renew-proxy
+    if [ -f ${INCLLST} ] ; then
+        # Use whitelisting and blacklisting
+        ${LJSF_JOBLISTMATCH} ${CONFIGVO} ${TEMPJDL} | egrep -f ${INCLLST} | egrep -v -f ${EXCLLST} | grep -e ".*:2119/.*" -e ".*:8443/.*" | sed 's/ - //g' \
+                         | awk '{print $1}' | awk -F':' '{printf "%s %s\n",$0,$1}' \
+                         | sort -r | uniq -f 1 > ${TEMPLIST}.0
+    else
+        # Use blacklisting only
+        ${LJSF_JOBLISTMATCH} ${CONFIGVO} ${TEMPJDL} | egrep -v -f ${EXCLLST} | grep -e ".*:2119/.*" -e ".*:8443/.*" | sed 's/ - //g' \
+                         | awk '{print $1}' | awk -F':' '{printf "%s %s\n",$0,$1}' \
+                         | sort -r | uniq -f 1 > ${TEMPLIST}.0
+    fi
+    [ -n "$DEBUG" ] && cat ${TEMPLIST}.0
+    cat ${TEMPLIST}.0 | while read line; do
+        CENAME="`echo $line | awk '{print $2}'`"
+        CS="`echo $line | awk '{print $1}'`"
+        if [ "$CENAME" != "" ] ; then
+            [ ! -s "${TEMPSITEINFO}.${CENAME}" ] && get-site-info $CS | egrep '^GlueSiteName|^gridName' > ${TEMPSITEINFO}.${CENAME}
+            SITENAME="`cat ${TEMPSITEINFO}.${CENAME} | grep ^GlueSiteName | tail -n 1 | awk '{print $2}'`"
+            GNAME="`cat ${TEMPSITEINFO}.${CENAME} | grep ^gridName | tail -n 1 | awk '{print $2}'`"
+            # Subscriptions
+            if [ "$GRIDNAME" == "ALL" -o "$GNAME" == "$GRIDNAME" ] ; then
+                if [ -n "$SITENAME" ] ; then
+                    #[ ! -s ${TEMPRELSUB}.${SITENAME} ] && ljsfinfo.py --show-rel-subscriptions --sitename=$SITENAME | sed 's/ALL/.*/' > ${TEMPRELSUB}.${SITENAME}
+                    [ ! -s ${TEMPRELSUB}.${SITENAME} ] && ljsfinfo.py --show-rel-subscriptions --sitename=$SITENAME > ${TEMPRELSUB}.${SITENAME}
+                    if [ "$DEBUG" == "yes" ] ; then
+                        echo "Release pattern for site $SITENAME is:"
+                        cat ${TEMPRELSUB}.${SITENAME}
+                    fi
+                    RELMATCH="`egrep "^$RELNAME$|^ALL$" ${TEMPRELSUB}.${SITENAME}`"
+                    #RELMATCH="`echo $RELNAME | egrep -f ${TEMPRELSUB}.${SITENAME}`"
+                    if [ -n "$RELMATCH" ] ; then
+                        [ "$DEBUG" == "yes" ] && echo "Release $RELNAME allowed for sitename $SITENAME"
+                        echo "$line $SITENAME" >> ${TEMPLIST}.1
+                    else
+                        [ "$DEBUG" == "yes" ] && echo "Release $RELNAME not allowed in site $SITENAME"
+                    fi
+                else
+                    echo "No sitename for $CENAME"
+                fi
+            fi
+        fi
+    done
+    cat ${TEMPLIST}.1 2>/dev/null | sort | uniq -f 2 | awk '{print $1}' | sort > ${TEMPLIST}
+    rm -f ${TEMPJDL}
+    echo "Requesting `cat ${TEMPLIST} | wc -l` installations for release ${RELNAME}"
+    cat ${TEMPLIST} | while read CS; do
+        TEMPSITEINFO="/tmp/siteinfo.$$"
+        CENAME="`echo $CS | awk -F ':' '{print $1}'`"
+        [ ! -s "${TEMPSITEINFO}.${CENAME}.sstatus" ] && ljsfinfo.py --querysite=$CS | tr ',' '\n' | sed 's/"//g' > ${TEMPSITEINFO}.${CENAME}.sstatus
+	FSTYPE="`cat ${TEMPSITEINFO}.${CENAME}.sstatus 2>/dev/null | grep '^SITE_FSTYPE=' | cut -d= -f 2`"
+        REQVETO="no"
+        if [ -n "$MAXRESJOBS" -a $MAXRESJOBS -gt 0 -a "$FSTYPE" != "cvmfs" ] ; then
+            RESJOBS="`ljsfbkk.py --conf=$CONFPATH/.my-ro.cnf --select=count --validation=pending --dest=$CENAME --quiet`"
+            if [ $RESJOBS -ge $MAXRESJOBS ] ; then
+                echo "REQUEST VETO> [${CENAME}] RELEASE=${RELNAME} RUNNING=${RESJOBS} - MAX=${MAXRESJOBS}"
+                REQVETO="yes"
+            fi
+        fi
+        if [ "$REQVETO" == "no" ] ; then
+            [ ! -s "${TEMPSITEINFO}.${CENAME}.sinfo" ] && get-site-info $CENAME | egrep '^GlueSiteName|^gridName' > ${TEMPSITEINFO}.${CENAME}.sinfo
+            SITENAME="`cat ${TEMPSITEINFO}.${CENAME}.sinfo | grep ^GlueSiteName | tail -n 1 | awk '{print $2}'`"
+            GNAME="`cat ${TEMPSITEINFO}.${CENAME}.sinfo | grep ^gridName | tail -n 1 | awk '{print $2}'`"
+            TC="`taskChange $CS $TASK | tail -n 1`"
+            [ -n "$TC" ] && TASKNAME=$TC || TASKNAME=$TASK
+            if [ "$TRIAL" == "yes" ] ; then
+                echo "ljsfreq.py --reqtype=${TASKNAME} --rel=${RELNAME} --cs=${CS} --sitename=${SITENAME} --grid-name=$GNAME --status=autorun --default-site-status=$DSSTATUS 2>/dev/null"
+            else
+                ljsfreq.py --reqtype=${TASKNAME} --rel=${RELNAME} --cs=${CS} --sitename=${SITENAME} --grid-name=$GNAME --status=autorun --default-site-status=$DSSTATUS 2>/dev/null
+            fi
+        fi
+    done
+    rm -f ${TEMPLIST}*
+    rm -f $WMSVOCONF
+    rm -f $WMSCMDCONF
+done
+
+# Clean up
+rm -f ${TEMPSITEINFO}* ${TEMPRELSUB}*
+rm -f $EXCLLST $INCLLST
+
+exit 0

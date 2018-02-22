@@ -1,0 +1,11 @@
+#
+#	Sample package asking installation questions
+#
+
+package('Package-D')
+
+shell('echo "hello world"')
+message("Hello world using Pacman is better.")
+message("Hi")
+
+message("C 2")

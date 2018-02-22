@@ -1,0 +1,113 @@
+BODY, P, DIV, TD, LI
+{
+  font-family: sans-serif;
+  font-size: 12px;
+}
+
+TH
+{
+  font-family: sans-serif;
+  font-size: 14px;
+}
+
+EM
+{
+  font-size: 150%;
+  font-weight: 900;
+  color: #FF0000;
+}
+
+INPUT, SELECT
+{
+  font-size: 12px;
+}
+
+BODY
+{
+  font: 80%/1.5, verdana arial sans-serif;
+  font-size: 10pt;
+}
+
+.caption
+{
+  Background-Color : #336699 ;
+  Height : 20 ;
+  Font-Size: 24pt;
+  Font-Weight : Bold ;
+  Color : #FFFFFF ;
+  Font-Family : Arial, Helvetica ;
+  Text-Align : Center ;
+}
+
+.captionimg
+{
+  Background-Color : #336699 ;
+  Height : 20 ;
+  Font-Size: 24pt;
+  Font-Weight : Bold ;
+  Color : #FF0000 ;
+  Font-Family : Arial, Helvetica ;
+  Text-Align : Left ;
+}
+
+.sidebarLink
+{
+  Color : #FFFFFF ;
+  Font-Weight : Bold ;
+  Font-Size : 10pt ;
+  Font-Family : Arial, Helvetica ;
+}
+
+.sidebarText
+{
+  Color : #EFEFEF ;
+  Font-Weight : Bold ;
+  Font-Size : 12pt ;
+  Font-Family : Arial, Helvetica ;
+}
+
+.graytable
+{
+  Background-Color : #EFEFEF ;
+}
+
+.greentable
+{
+  Background-Color: #AAFFAA ;
+}
+
+.selection
+{
+  Background-Color : #AA3399 ;
+  Height : 16 ;
+  Font-Size: 14pt;
+  Font-Weight : Bold ;
+  Color : #FFFFFF ;
+  Font-Family : Arial, Helvetica ;
+  Text-Align : Left ;
+}
+
+.sidebar
+{
+  Background-Color : #007FCD ;
+  Color : #0000FF ;
+  Font-Family : Arial, Helvetica ;
+  Text-Align : Left ;
+}
+
+A         {text-decoration:none;}
+A:link    {color:#000099;}
+A:visited {color:#000099;}
+A:hover   {color:#DF0000;}
+
+H1 {border-width: 1; border: solid; text-align: center}
+a{ position:relative;
+    z-index:24; color: #000;
+    text-decoration: none}
+a:hover{ z-index: 25; background-color: #ff0; }
+a span{display: none}
+a:hover span{
+    display: block; position:absolute;
+    top: 2em; left: 2em; width: 30em;
+    border: 1px solid #0cf; background-color: #cff; color:#000;
+    font-size: 80%;text-align: left}

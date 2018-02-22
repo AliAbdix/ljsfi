@@ -1,0 +1,31 @@
+# Get current job status
+getStatus()
+{
+  TMPFILE=/tmp/tmp.status.$$
+  JOBID_LIST=$1
+  shift
+  OPTS="$@"
+  gbb -l 900 $LJSF_JOBSTATUS --csv --jobid=$JOBID_LIST >& $TMPFILE
+  cat $TMPFILE | while read JOBSTAT; do
+    JOBID="`echo $JOBSTAT | cut -d, -f 1`"
+    STATUS="`echo $JOBSTAT | cut -d, -f 2`"
+    if [ "$STATUS" = "failed" ] ; then
+      REASON="`echo $JOBSTAT | cut -d, -f 6 | sed 's/|/,/g' | cut -b -255 | sed "s/'/\\\\\'/g"`"
+      [ -z "$REASON" ] && REASON=$STATUS
+    else
+      REASON=$STATUS
+    fi
+    DEST="`echo $JOBSTAT | cut -d, -f 3`"
+    CS=$DEST
+    REACH="`echo $JOBSTAT | cut -d, -f 4`"
+    EXITCODE="`echo $JOBSTAT | cut -d, -f 5`"
+    if [ -n "$EXITCODE" ] ; then
+      echo "$JOBID|$STATUS|$DEST|$REACH|$EXITCODE"
+      ljsfbkk.py --insert --jobid="$JOBID" --reachtime="$REACH" --status="$STATUS" --statreason="$REASON" --dest="$DEST" --cs="$CS" --exit="$EXITCODE" $OPTS
+    else
+      echo "$JOBID|$STATUS|$DEST|$REACH"
+      ljsfbkk.py --insert --jobid="$JOBID" --reachtime="$REACH" --status="$STATUS" --statreason="$REASON" --dest="$DEST" --cs="$CS" $OPTS
+    fi
+  done
+  rm -f $TMPFILE
+}

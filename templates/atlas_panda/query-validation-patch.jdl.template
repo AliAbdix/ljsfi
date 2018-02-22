@@ -1,0 +1,6 @@
+{
+    "JobDef": {
+        "Tags": ["!@RELTAG@", "@RELREQ@"]
+    }
+}
+

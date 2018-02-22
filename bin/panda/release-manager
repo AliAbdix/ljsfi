@@ -1,0 +1,414 @@
+#!/bin/sh
+help()
+{
+  echo "Usage: `basename $0` [OPTIONS] <task> <release version> <Contact String>"
+  echo "       OPTIONS:"
+  echo "            -A|--admin-id <id>  Set the admin user id to <id>."
+  echo "            -a|--autoconf       Use a configuration file created on the fly."
+  echo "            -c|--conf <file>    Get configuration from <file>."
+  echo "            -d|--debug          Output debug messages."
+  echo "            -h|--help           Display this help."
+  echo "            -n|--no-check       Skip the site checks."
+  echo "            -N|--num-jobs <n>   Send <n> jobs."
+  echo "            -p|--protocol <n>   Use protocol <n> (default: $RMPROTOCOL)."
+  echo "            -r|--request <id>   Specify the request id for this job."
+  echo "            -S|--skip-lock      Skip the job lock checks."
+  echo "            -s|--submit         Submit immediately the created job."
+  exit 0
+}
+
+timeout () {
+    perl -e 'alarm shift; exec @ARGV' "$@";
+}
+
+# Defaults
+SUBMIT="no"
+REQID=""
+REQID_OPT=""
+INSTCONF=$CONFPATH/install.conf
+AUTOCONF="no"
+CHECKSITE="yes"
+RMPROTOCOL=1
+export X509_CERT_DIR=${X509_CERT_DIR:-/etc/grid-security/certificates}
+echo "[`date`] $0 starting"
+
+# Read the configuration file, if present
+[ -s "$CONFPATH/rmanager.conf" ] && source $CONFPATH/rmanager.conf
+
+# Get the command line options
+OPTS=`getopt -o A:ac:dhnN:p:r:sS -l admin-id:,autoconf,conf:,debug,help,no-check,num-jobs:,protocol:,request:,skip-lock,submit -- "$@"`
+if [ $? != 0 ] ; then echo "Terminating..."; exit -1 ; fi
+eval set -- "$OPTS"
+while true ; do
+        case "$1" in
+                -h|--help)         help; shift;;
+                -A|--admin-id)     ADMINID="--admin-id $2";shift 2;;
+                -a|--autoconf)     AUTOCONF="yes";shift;;
+                -c|--conf)         INSTCONF="$2"; shift 2;;
+                -d|--debug)        DEBUG="yes"; shift;;
+                -n|--no-check)     CHECKSITE="no"; shift;;
+                -N|--num-jobs)     NUMJOBS="$2"; shift 2;;
+                -p|--protocol)     RMPROTOCOL="$2"; shift 2;;
+                -r|--request)      REQID="$2"; shift 2;;
+                -s|--submit)       SUBMIT="yes"; shift;;
+                -S|--skip-lock)    SKIPLOCK="yes"; shift;;
+                --)                shift ; break ;;
+                \?)                break ;
+                exit ;;
+        esac
+done
+[ "$REQID" != "" ] && REQID_OPT="-r $REQID"
+
+# Get the positional arguments
+TASK="${1}"
+RELEASE="${2}"
+MACHINE="${3}"
+rc=0
+
+if [ "$MACHINE" == "" ] ; then
+  help
+  exit -1
+fi
+
+# Release name structure: [<rel_extra_def>:]<rel name>-<rel type>_<rel category>
+RELNAME="`echo $RELEASE | cut -d ':' -f 2- | cut -d '-' -f 1  | cut -d '+' -f 1 | cut -d '@' -f 1`"
+case "$RELNAME" in
+     rel_[0-9]) ;;
+     *)         RELNAME="`echo $RELNAME | cut -d '_' -f 1`";;
+esac
+RELTYPE="`echo $RELEASE | cut -d ':' -f 2- | cut -d '-' -f 2- | cut -d '_' -f 1`"
+RELCATEGORY="`echo $RELEASE | cut -d ':' -f 2- | cut -d '-' -f 2- | cut -d '_' -f 2`"
+RELSTRING="`echo $RELEASE | sed 's/:/_/g'`"
+TMPRELDATA="/tmp/reldata.tmp.`date +%s`$$"
+
+if [ "$AUTOCONF" == "yes" ] ; then
+  TMPCONF="/tmp/autoconf.`date +%s`$$"
+  echo "[`date`] Autoconfiguring release $RELEASE"
+  ljsfinfo.py --queryrel=$RELEASE --create-conf=$TMPCONF --cache --cache-timeout 3600 > $TMPRELDATA
+  if [ ! -s $TMPCONF ] ; then
+    echo "Cannot create the auto configuration file"
+    exit -1
+  else
+    INSTCONF=$TMPCONF
+  fi
+fi
+
+source $INSTCONF
+
+if [ $RMPROTOCOL -eq 1 ] ; then
+  # KV posting option
+  [ "$KVPOST" == "yes" ] && KV_POST_OPT="--kvpost"
+
+  # Other parameters
+  [ "$KITCACHE" != "" ] && KITCACHEOPT="--kit-cache\ $KITCACHE" || KITCACHEOPT=""
+  [ "$DBREL"    != "" ] && DBRELOPT="--dbrelease\ $DBREL"       || DBRELOPT=""
+fi
+
+# Check the DB status
+$BINPATH/dbcheck
+rc=$?
+[ $rc -ne 0 ] && exit $rc
+
+[ "$TEMPLATEPATH" = "" ] && TEMPLATEPATH=$PWD/templates
+mkdir -p $JDLPATH
+
+# Use the host list if required
+TMPHOSTLIST="$HOSTLIST.tmp.`date +%s`$$"
+if [ "$MACHINE" = "" ] ; then
+  cp $HOSTLIST $TMPHOSTLIST
+else
+  echo $MACHINE > $TMPHOSTLIST
+fi
+
+# Consistency checks
+if [ "$TASK" == "check-site" -o "$TASK" == "check-site-nogbb" ] ; then
+  if [ "$RELEASE" != "ALL" -a "$RELEASE" != "all" ] ; then
+    echo "Wrong release name for task $TASK. Please use 'all'"
+    rm -f $TMPHOSTLIST
+    exit -1
+  fi
+else
+  if [ -s "$TMPRELDATA" ] ; then
+      echo "[`date`] Using cached release data $TMPRELDATA"
+      RELDATA="`cat $TMPRELDATA`"
+  else
+      echo "Retrieving release data for $RELEASE"
+      #RELDATA="`ljsfinfo.py --queryrel=$RELEASE --cache --cache-timeout 3600`"
+      RELDATA="`ljsf get release info name=$RELEASE quiet showtokens`"
+  fi
+  if [ "$RELDATA" == "" ] ; then
+    echo "Unknown release $RELEASE"
+    rm -f $TMPHOSTLIST
+    exit -1
+  fi
+  echo $RELDATA | egrep -q "\".*=*$TASK\""
+  if [ $? -ne 0 ] ; then
+    echo "WARNING: task \"$TASK\" not in the default task list for release $RELEASE"
+    echo -n "Do you want to continue? [y/N]: "
+    read answ
+    if [ "$answ" != "y" -a "$answ" != "Y" ] ; then
+        rm -f $TMPHOSTLIST
+        exit 0
+    fi
+  fi
+fi
+
+# Process the request
+while read line; do
+  CEQUEUE=${line}
+  CENAME="`echo ${CEQUEUE} | cut -d: -f 1 | sed 's/ //g'`"
+  if [ $RMPROTOCOL -eq 1 ] ; then
+      SITEALIAS="`ljsfinfo.py --show-alias --cename=${CENAME} --cache --cache-timeout 3600 | grep -v -i none | awk '{print $NF}' | tail -n 1`"
+      [ "$SITEALIAS" == "" ] && SITEALIAS="%UNDEFINED_SITE_ALIAS"
+  fi
+  CLOSESE=`cat ${SITESOUTPUTPATH}/*${CENAME}[-.]*/*.txt 2>&1 | grep "Default SE" | tail -n 1 | cut -d: -f 2 | sed 's/ //g'`
+  JOBFILE=""
+  if [ "$TASK" == "check-site" -o "$TASK" == "check-site-nogbb" ] ; then
+      JOBFILE=${SITESJDLPATH}/${TASK}-${CENAME}.jdl
+  else
+      if [ "$CLOSESE" != "" -o "$CHECKSITE" == "no" ] ; then
+          JOBFILE=${JDLPATH}/${TASK}-${RELSTRING}-${CENAME}.jdl
+      else
+          echo "No site parameter found for $CENAME."
+          if [ "$SUBMIT" == "yes" ] ; then
+              release-manager -s -r ${REQID} check-site all $CEQUEUE
+              if [ $? -ne 0 ] ; then
+                  echo "No check-site submitted"
+              else
+                  echo "check-site submitted"
+              fi
+          else
+              echo "Please run check-site first"
+          fi
+          rm -f $TMPHOSTLIST
+          exit 15
+      fi
+  fi
+  if [ "${JOBFILE}" != "" ] ; then
+      JDLNAME="`basename $JOBFILE`"
+      if [ -z "$SKIPLOCK" ] ; then
+          #JDLLOCK="`ljsfinfo.py --show-lock --jdlname=$JDLNAME`"
+          #if [ "`echo $JDLLOCK | awk '{print $1}'`" != "unlocked" ] ; then
+              #echo "$JDLNAME already locked by `echo $JDLLOCK | awk '{print $2}'`"
+          #JDLLOCK="`curl -S -s -X GET --capath $X509_CERT_DIR --cert $X509_USER_PROXY --key $X509_USER_PROXY "$LJSFDBURL/joblock.php?jdlname=$JDLNAME"`"
+          JDLLOCK="`ljsf get job lock jdlname=$JDLNAME`"
+          if [ "`echo $JDLLOCK | cut -d, -f 2`" != "unlocked" ] ; then
+              echo "$JDLNAME already locked by `echo $JDLLOCK | cut -d, -f 3`"
+              rm -f $TMPHOSTLIST
+              exit -1
+          fi
+      fi
+      if [ $RMPROTOCOL -eq 1 ] ; then
+          [ "$REQUIRES" != "" ] && EXTRAPKG="--extra-pkg\ ${REQUIREDPRJ}_`echo ${REQUIRES} | sed 's#\.#_#g'`${RELARCH}_opt"
+          [ "$ATLASCOMPILER" != "no" ] && COMPILEROPT="--require-compiler"
+      fi
+      RELMAIN="`echo $REQUIRES | cut -d, -f 2 | cut -d ':' -f 2- | cut -d '-' -f 1  | cut -d '+' -f 1 | cut -d '_' -f 1 | cut -d '@' -f 2`"
+      osname="-"
+      osrelease="-"
+      osversion="-"
+      sitename="-"
+      atlas_sitename="-"
+      TMPDUMP="tmpdump.`date +%s`$$"
+      ljsf-infosys --info --panda-resource $CEQUEUE --cache --cache-timeout 7200 &> $TMPDUMP
+      osname="`cat $TMPDUMP | grep '^OSNAME=' | tail -n 1 | cut -d= -f 2`"
+      osrelease="`cat $TMPDUMP | grep '^OSRELEASE=' | tail -n 1 | cut -d= -f 2`"
+      osversion="`cat $TMPDUMP | grep '^OSVERSION=' | tail -n 1 | cut -d= -f 2`"
+      sitename="`cat $TMPDUMP | grep '^SITENAME=' | tail -n 1 | cut -d= -f 2`"
+      atlas_sitename="`cat $TMPDUMP | grep '^ATLAS_SITENAME=' | tail -n 1 | cut -d= -f 2`"
+      gridname="`cat $TMPDUMP | grep '^GRID=' | tail -n 1 | cut -d= -f 2`"
+      sitetype="`cat $TMPDUMP | grep '^SITETYPE=' | tail -n 1 | cut -d= -f 2-`"
+      tierlevel="`cat $TMPDUMP | grep '^TIER_LEVEL=' | tail -n 1 | cut -d= -f 2-`"
+      [ -z "$atlas_sitename" ] && atlas_sitename="$sitename"
+      [ -n "$osname" -a "$osname" != "UNKNOWN" ] && OSNAME_OPT="--osname $osname"
+      [ -n "$osversion" -a "$osversion" != "UNKNOWN" ] && OSVERSION_OPT="--osversion $osversion"
+      [ -n "$osrelease" -a "$osrelease" != "0" ] && OSRELEASE_OPT="--osrelease $osrelease"
+      [ -n "$tierlevel" ] && TIERLEVEL_OPT="--tier-level $tierlevel"
+      rm -f $TMPDUMP
+
+      if [ -s ${TEMPLATEPATH}/${gridname}/${TASK}.jdl.template ] ; then
+        JDLTEMPLATE=${TEMPLATEPATH}/${gridname}/${TASK}.jdl.template
+      else
+        JDLTEMPLATE=${TEMPLATEPATH}/${TASK}.jdl.template
+      fi
+      if [ ! -f "${JDLTEMPLATE}" ] ; then
+        echo "Cannot find template file $JDLTEMPLATE"
+        break
+      fi
+
+      if [ $RMPROTOCOL -eq 1 ] ; then
+          # Transformations
+          if [ "$gridname" == "OSG" ] ; then
+              LOGPATH="`echo $LOGPATH | sed 's;/software;/atlas_rel;g'`"
+              PHYSPATH="$LOGPATH"
+              [ "$RELCATEGORY" == "release" ] && VERSIONAREA="$RELNAME" || VERSIONAREA="$RELMAIN"
+          fi
+
+          # Build the JDL
+          echo "[`date`] Creating ${JOBFILE}"
+          eval sed -e s#RELARCH#$RELARCH#g \
+                   -e s#ARCH#$ARCH#g \
+                   -e s#SWNAME#$SWNAME#g \
+                   -e s#CEID#$CEQUEUE#g \
+                   -e s#CENAME#$CENAME#g \
+                   -e s#RELEASE#$RELEASE#g \
+                   -e s#TOOLSPATH#$TOOLSPATH#g \
+                   -e s#REVISIONVER#$REVISIONVER#g \
+                   -e s#INSTALLERVER#$INSTALLERVER#g \
+                   -e s#INSTALLTOOLSVER#$INSTALLTOOLSVER#g \
+                   -e s#CLOSESE#$CLOSESE#g \
+                   -e s#SCRIPTPATH#$SCRIPTPATH#g \
+                   -e s#GBB_SURL#$GBB_SURL#g \
+                   -e s#PACMANPLATFORM#$PACMANPLATFORM#g \
+                   -e s#PACMANVERSION#$PACMANVERSION#g \
+                   -e s#LCGCATALOGTYPE#$LCG_CATALOG_TYPE#g \
+                   -e s#LFCHOST#$LFC_HOST#g \
+                   -e s#LJSFLIBPATH#$LJSFLIBPATH#g \
+                   -e s#VERSIONAREA#$VERSIONAREA#g \
+                   -e s#USERDIRECTORY#$USERDIRECTORY#g \
+                   -e s#ATLASFIX64#$ATLASFIX64#g \
+                   -e s#ATLASCOMPILER#$ATLASCOMPILER#g \
+                   -e s#COMPILEROPT#$COMPILEROPT#g \
+                   -e s#DB_REL#$DB_REL#g \
+                   -e s#KVPOST#$KVPOST#g \
+                   -e s#KV_POST_OPT#$KV_POST_OPT#g \
+                   -e s#ATLASSWDIR#$ATLASSWDIR#g \
+                   -e s#RELNAME#$RELNAME#g \
+                   -e s#RELMAIN#$RELMAIN#g \
+                   -e s#RELTYPE#$RELTYPE#g \
+                   -e s#RELCATEGORY#$RELCATEGORY#g \
+                   -e s#RELTAG#$RELTAG#g \
+                   -e s#REQPRJ#$REQUIREDPRJ#g \
+                   -e s#KITCACHE#$KITCACHEOPT#g \
+                   -e s#PACKAGE#$PACKAGE#g \
+                   -e s#PHYSPATH#$PHYSPATH#g \
+                   -e s#LOGPATH#$LOGPATH#g \
+                   -e s#DISKSPACE#$DISKSPACE#g \
+                   -e s#DBREL#$DBRELOPT#g \
+                   -e s#EXTRAPKG#$EXTRAPKG#g \
+                   -e s#DQ2SITEID#$SITEALIAS#g \
+                   -e s#SCNAME#$SCNAME#g \
+                   -e s#GRIDNAME#$gridname#g \
+                   ${JDLTEMPLATE} > ${JOBFILE}
+
+          # Transformations
+          if [ "$gridname" == "OSG" ] ; then
+              VONAME="`echo $VO | tr a-z A-Z`"
+              VODIR="`echo $VO | tr A-Z a-z`"
+              sed -i "s#VO_${VONAME}_SW_DIR#OSG_APP/${VODIR}_app#g" ${JOBFILE}
+          fi
+      else
+          PARSER=${JOBFILE}.parser
+
+          echo "[`date`] Creating parser"
+
+          # Auto release parser
+          #ljsfinfo.py --gen-parser --queryrel="${RELEASE}" --cache --cache-timeout 3600 > ${PARSER}
+          ljsf get release info name="${RELEASE}" quiet genparser > ${PARSER}
+
+          # Auto site parser
+          #ljsfinfo.py --gen-parser --querysite="${CEQUEUE}" --cache --cache-timeout 3600 >> ${PARSER}
+          ljsf get site info name="${CEQUEUE}" quiet genparser >> ${PARSER}
+
+          # Auto infosys parser
+          #ljsf-infosys --gen-parser --panda-resource="${CEQUEUE}" --cache --cache-timeout 7200 >> ${PARSER}
+          ljsf get resource parser name="${CEQUEUE}" >> ${PARSER}
+
+          # Other parameters
+          LJSFSERVER="`dirname $LJSFDBURL`"
+cat >> $PARSER <<EOD
+s#@TOOLSPATH@#$TOOLSPATH#g
+s#@CLOSESE@#$CLOSESE#g
+s#@SCRIPTPATH@#$SCRIPTPATH#g
+s#@GBB_SURL@#$GBB_SURL#g
+s#@LCGCATALOGTYPE@#$LCG_CATALOG_TYPE#g
+s#@LFCHOST@#$LFC_HOST#g
+s#@LJSFLIBPATH@#$LJSFLIBPATH#g
+s#@SCNAME@#$SCNAME#g
+s#@GRIDNAME@#$gridname#g
+s#@VONAME@#$VO#g
+s#@RELNAME@#$RELNAME#g
+s#@RELMAIN@#$RELMAIN#g
+s#@LJSFSERVER@#$LJSFSERVER#g
+EOD
+
+          # Parse the template and create the job file
+          if [ -f "$PARSER" ] ; then
+              echo "[`date`] Creating ${JOBFILE}"
+              sed -f ${PARSER} ${JDLTEMPLATE} > ${JOBFILE}
+              rm -f ${PARSER}
+          fi
+      fi
+
+      # define the task
+      if [ "$TASK" == "check-site" ] ; then
+          ljsfinfo.py --create --cename="$CENAME" --cs="$CEQUEUE" \
+                      --jdlname="`basename $JOBFILE`" --jdltype="$TASK" \
+                      --jdlfile="$JOBFILE" --sitename="$sitename" \
+                      --atlas-sitename=$atlas_sitename \
+                      $OSNAME_OPT $OSVERSION_OPT $OSRELEASE_OPT $TIERLEVEL_OPT \
+                      --rel="ALL" --tag="NONE" --grid-name="$gridname" \
+                      --sitetype=$sitetype --facility="Panda"
+      else
+          echo "[`date`] Defining job"
+          ljsfinfo.py --create --cename="$CENAME" --cs="$CEQUEUE" \
+                      --jdlname="`basename $JOBFILE`" --jdltype="$TASK" \
+                      --jdlfile="$JOBFILE" --arch="`echo $ARCH | sed 's/^-//g'`" \
+                      $OSNAME_OPT $OSVERSION_OPT $OSRELEASE_OPT $TIERLEVEL_OPT \
+                      --atlas-sitename=$atlas_sitename \
+                      --sitename="$sitename" --rel="$RELEASE" --tag="$RELTAG" \
+                      --grid-name="$gridname" --sitetype=$sitetype --facility="Panda"
+      fi
+      # Check for undefined symbols
+      UNDEFSYMBOL="`grep '%UNDEFINED_' ${JOBFILE} | sed 's/\(.*\)%UNDEFINED_\([A-Za-z0-9_]*\)\(.*\)/\2/'`"
+      grep -q '@[^@]*@' ${JOBFILE}
+      [ $? -eq 0 ] && MALFORMED=1 || MALFORMED=0
+      if [ "$UNDEFSYMBOL" != "" ] ; then
+          # Don't submit the job and notify the user
+          echo "Error while processing `basename ${JOBFILE}`"
+          echo "Undefined symbol(s) found: ${UNDEFSYMBOL}. Cannot submit the job."
+          if [ "$REQID" != "" ] ; then
+              #ljsfreq.py --update --reqid="$REQID" --status="stopped" --comments="Undefined symbol ${UNDEFSYMBOL}"
+              ljsf set request status id="$REQID" status="stopped" comments="Undefined symbol ${UNDEFSYMBOL}"
+              #ljsfinfo.py --status="invalid" --cs="$CEQUEUE" --rel="$RELEASE"
+              ljsf set release dstat status="invalid" resource="$CEQUEUE" name="$RELEASE"
+          fi
+          rc=100
+      elif [ $MALFORMED -eq 1 ] ; then
+          echo "Malformed jdl"
+          cat ${JOBFILE}
+      else
+          # Submit the job if the automatic submission is enabled
+          if [ "$SUBMIT" == "yes" ] ; then
+              rc=0
+              for nj in `seq 1 $NUMJOBS`; do
+                  echo "[`date`] Submitting job #$nj"
+                  #[ $nj -gt 1 ] && ljsfinfo.py --remove-lock --jdlname="`basename $JOBFILE`"
+                  [ $nj -gt 1 ] && ljsf del job lock jdlname="`basename $JOBFILE`"
+                  submit -c ${INSTCONF} -R $CEQUEUE ${REQID_OPT} ${ADMINID} ${JOBFILE}
+                  rc=$((subrc+$?))
+                  if [ -n "`ljsf get resource master name=$CEQUEUE`" ] ; then
+                      ljsf set release dstat name=$RELEASE resource=$CEQUEUE status=waiting
+                  fi
+              done
+              if [ $rc -eq 0 ] ; then
+                  # Execute the plugins on success
+                  for plugin in `\ls $BINPATH/$LJSF_CMDSET/plugins.d/submit*.sh`; do
+                      $plugin "$CEQUEUE" "$RELEASE"
+                  done
+              fi
+          fi
+          # Update the DB status
+          if [ $rc -eq 0 -a "$TASK" == "check-site" -a "$REQID" != "" ] ; then
+              echo "[`date`] Update DB status"
+              #ljsfreq.py --update --reqid="$REQID" --status="accepted" --comments="Checking site"
+              ljsf set request status id="$REQID" status="accepted" comments="Checking site"
+          fi
+      fi
+  fi
+done < $TMPHOSTLIST
+rm -f $TMPHOSTLIST
+
+[ "$AUTOCONF" == "yes" ] && rm -f $TMPCONF $TMPRELDATA
+echo "[`date`] $0 closing"
+
+exit $rc

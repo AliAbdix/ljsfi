@@ -1,0 +1,9 @@
+Executable = "gbb";
+InputSandbox = {"@SCRIPTPATH@/sw-mgr","@SCRIPTPATH@/gbb","@SCRIPTPATH@/lcg-tags"};
+OutputSandbox = {"stdout", "stderr", "install.xml"};
+stdoutput = "stdout";
+stderror = "stderr";
+Arguments = "--timing -v -m 300 -p -D 600 -s @GBB_SURL@ sw-mgr -i @RELNAME@ -l @OSGLOGICALPATH@/@RELMAIN@ -p @OSGPHYSICALPATH@/@VERSIONAREA@ -o --use-grid --grid-name @GRIDNAME@ --replicate --release-ver @SWREVISION@ --host @TAGHOST@ --vo atlas --require-shfs --disk-free @DISKSPACE@ --add-tags --tags @RELTAG@ --force-tags -P @SWNAME@ --require-prj @REQUIREDPRJ@ -T t0patch -t @ARCH@ -O opt -m @PACMANVERSION@ --dump-tags $OSG_APP/atlas_app/atlas_rel/tags --xml install.xml --site-config $OSG_APP/atlas_app/atlas_rel/AtlasSiteConfig.sh @KVPOST@ @KITCACHE@ @DBRELEASE@";
+Environment = {"LCG_CATALOG_TYPE=@LCGCATALOGTYPE@","LFC_HOST=@LFCHOST@"};
+VirtualOrganisation = "atlas";
+Requirements = other.GlueCEUniqueId=="@SITE_CS@";

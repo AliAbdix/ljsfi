@@ -1,0 +1,43 @@
+<title>Installations are caches too</title>
+<body background="sky.gif">
+<p>
+<h1><font color=navy>Installations are caches too</font></h1>
+<p>
+<hr size=5>
+<p>
+    By now, you might have noticed that installations are caches too.  Let's see how this works.  Make a working
+directory (e.g. <b>work</b>) and do:
+<pre><b><font color="#8B0000">% pacman -get BU:Python Pacman:Pacman
+</font></pre></b>
+Now make a directory <b>../work2</b>, cd there and do
+<pre><b><font color="#8B0000">% pacman -lc ../work
+% pacman -l Python
+</font></pre></b>
+and you'll see that operationally, your original installation is a cache.  You can also "install" from this cache.  Try
+<pre><b><font color="#8B0000">% pacman -get ../work:Python
+% pacman -l
+</font></pre></b>
+and you'll see that Python appears in your installation and although the actually software hasn't been copied, correct
+setup scripts have been prepared.  This might seem a bit odd, but it's actually a very useful thing to do for two
+reasons:
+<ol>
+<li> Suppose you want to use two pieces of software A and B simultaneously.  If you set them up with conventional
+scripts, then A and B may interfere with each other by, for instance, using common environment variables or putting
+common files in your $PATH.  You can avoid this by always using Pacman to setup software using the same commands that you
+use to install the software originally.  If A and B interfere with each other, Pacman will detect this and inform you of
+the problem using the same mechanisms that you are used to already.
+<li> Suppose that you want to have a single installation with, say, all known versions of Python in it. If you try this
+with <b>-get</b> or <b>-install</b> and then <b>-setup</b>, you will find that it doesn't work because the
+different versions of Python all put <b>python</b> in your path and have clashing environment variables.  Pacman detects
+these clashes and refuses to generate the usual setup scripts.  You can, however, nicely deal with this situation by
+separating intallation and setup.  You can install all of the Python versions in the installation and then do <b>-get</b>
+or <b>-setup</b> from a separate installation.
+</ol>
+Installations may appear in <b>.caches</b> files and have all the functionality of the other caches except that you can't
+install from an installation on a remote machine.
+<p>
+<hr size=5>
+<h3><a href="http://physics.bu.edu/pacman/" target="_blank">Pacman Headquarters</a></h3>
+<p>
+</body>
+

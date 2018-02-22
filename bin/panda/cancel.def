@@ -1,0 +1,16 @@
+# Cancel a submitted job
+cancelJob()
+{
+  JOB=$1
+  JOBNAME="`basename $JOB | sed 's/.job//g'`"
+  JOBID="`cat $JOB 2>/dev/null | grep "^PandaID" | sed 's/^PandaID=\(.*\)/\1/'`"
+  $LJSF_JOBCANCEL $JOBID
+}
+
+# Cancel a submitted job by job ID
+cancelJobByID()
+{
+  JOBID="$1"
+  echo "Cancelling job ID $JOBID"
+  $LJSF_JOBCANCEL $JOBID
+}

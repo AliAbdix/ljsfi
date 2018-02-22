@@ -1,0 +1,27 @@
+<title>How to use Pacman to guarantee correct software setups</title>
+<body background="sky.gif">
+<p>
+<h1><font color=navy>How to use Pacman to guarantee correct software setup scripts</font></h1>
+<p>
+<hr size=5>
+<p>
+     Pacman encompasses installation, configuration and setup in a consistent system.  For example, in
+order to use software one normally has to add locations to paths or define certain environment
+variables or perhaps source some shell scripts.  The problem is that if you need to use several
+pieces of software the setup procedures might interfere with each other.  For instance, two
+packages might put two versions of the same binary in your path causing a problem for either one
+package or the other.
+<p>
+     Pacman lets you solve these problems in a unified way by using Pacman for setup as well as
+installation and configuration.  For example, if packages PackA, PackB and PackC, are already installed on your system
+in Pacman installations at /home/a, /home/b, home/c respectively, you can set yourself up to use all
+three together by just doing
+<pre><b><font color="#8B0000">% pacman -get /home/a:PackA /home/b:PackB /home/c:PackC
+</font></pre></b>
+Pacman then checks that these three packages are consistent and, if so, it generates setup scripts for you.  If they are inconsistent, Pacman tells you
+this using the same familiar mechanisms used for installation. 
+<p>
+<hr size=5>
+<h3><a href="http://physics.bu.edu/pacman/" target="_blank">Pacman Headquarters</a></h3>
+<p>
+</body>

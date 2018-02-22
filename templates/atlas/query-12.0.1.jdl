@@ -1,0 +1,6 @@
+Executable = "/bin/hostname";
+OutputSandbox = {"stdout","stderr"};
+stdoutput = "stdout";
+stderror = "stderr";
+VirtualOrganisation = "atlas";
+Requirements = Member("VO-atlas-offline-12.0.1",other.GlueHostApplicationSoftwareRunTimeEnvironment);
